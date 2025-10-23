@@ -368,20 +368,32 @@ async function init(){
     const parsed=parseCSVsmart(csvTxt);
 
     // --- identify columns flexibly ---
-    cities=parsed.map(r=>{
-      const name=r.city||r.City||r['City Name']||r['name']||r['NAME']||r['Město'];
-      let lat=null,lon=null;
-      // try coordinate pairs
-      const combo=r['lat;lng']||r['lat;lon']||r['lat,lng']||r['latlon']||r['coords']||'';
-      const pair=toLatLon(combo);
-      if(pair){lat=pair.lat;lon=pair.lon;}
-      else{
-        const la=parseFloat(r.lat||r.Lat||r.latitude||r.Latitude);
-        const lo=parseFloat(r.lng||r.lon||r.Lon||r.Longitude||r.longitude);
-        if(isFinite(la)&&isFinite(lo)){lat=la;lon=lo;}
-      }
-      return {name,lat,lon};
-    }).filter(c=>c.name&&isFinite(c.lat)&&isFinite(c.lon));
+cities = parsed.map(r => {
+  const name = r.city || r.City || r['City Name'] || r['name'] || r['NAME'] || r['Město'];
+
+  let lat = null, lon = null;
+
+  // try coordinate pairs first
+  const combo = r['lat;lng'] || r['lat;lon'] || r['lat,lng'] || r['latlon'] || r['coords'] || '';
+  const pair = toLatLon(combo);
+  if (pair) {
+    lat = pair.lat;
+    lon = pair.lon;
+  } else {
+    const la = parseNumber(r.lat || r.Lat || r.latitude || r.Latitude);
+    const lo = parseNumber(r.lng || r.lon || r.Lon || r.Longitude || r.longitude);
+    if (isFinite(la) && isFinite(lo)) {
+      lat = la;
+      lon = lo;
+    }
+  }
+
+  return { name, lat, lon };
+}).filter(c => c.name && isFinite(c.lat) && isFinite(c.lon));
+function parseNumber(val) {
+  if (!val) return NaN;
+  return parseFloat(val.replace(',', '.'));
+}
 
     if(!cities.length) throw new Error('No valid cities parsed from CSV.');
 
