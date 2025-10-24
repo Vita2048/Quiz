@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Czech Cities Population Map</title>
 <style>
+  :root {
+    /* Single source of truth for map outline & leader line color */
+    --outline-color: #ffffff;
+  }
+
   html, body {
     margin:0; padding:0;
     height:100%; width:100%;
@@ -18,17 +23,23 @@
   #mapContainer { width:100%; height:100%; }
   #mapContainer svg { width:100%; height:100%; display:block; }
 
-  /* Keep original look of map strokes; fill will be set via JS to match page background */
-  svg#czMap path { stroke:#cccccc; stroke-width:0.8; }
+  /* Map outline strokes follow CSS variable; fill set via JS to match background */
+  svg#czMap path { stroke: var(--outline-color); stroke-width:0.8; }
 
   text.city-label {
-    fill:#fff; font-size:4px; font-family:sans-serif; text-anchor:middle;
-    paint-order: stroke; stroke: rgba(0,0,0,0.6); stroke-width: 1px; pointer-events:none;
+    fill: var(--outline-color);
+    font-size:4px; font-family:sans-serif; text-anchor:middle;
+    paint-order: stroke;
+    /* Stroke toggled via JS (removed on light backgrounds) */
+    stroke-width: 1px;
+    pointer-events:none;
+    text-rendering: optimizeSpeed; /* crisper at small sizes */
   }
 
-  .leader { stroke: rgba(255,255,255,0.65); stroke-width: 0.6; stroke-linecap: round; fill: none; opacity:0.9; }
+  /* Leader lines use the same outline color */
+  .leader { stroke: var(--outline-color); stroke-width: 0.6; stroke-linecap: round; fill: none; opacity:0.9; }
 
-  /* ORIGINAL population filter styles — unchanged */
+  /* Population filter — unchanged */
   .filter-overlay {
     position:absolute; top:14px; left:14px; background:#0b1220; border:1px solid rgba(255,255,255,0.08);
     border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:10px;
@@ -50,7 +61,7 @@
   .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
   #mapLoader { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#9aa4b2; text-align:center; padding:10px; }
 
-  /* NEW: right-side background color panel */
+  /* Background color panel (right) */
   .bg-panel {
     position:absolute; top:14px; right:14px; background:#0b1220; border:1px solid rgba(255,255,255,0.08);
     border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:10px;
@@ -85,7 +96,7 @@
       </div>
     </div>
 
-    <!-- NEW: Background color panel -->
+    <!-- Background color panel -->
     <div class="bg-panel" role="group" aria-label="Background color">
       <div class="bg-title">Background color</div>
       <div class="bg-row">
@@ -130,16 +141,6 @@ const minValEl = document.getElementById('minVal');
 const maxValEl = document.getElementById('maxVal');
 const srEl = document.getElementById('rangeSr');
 
-function toLatLon(text){
-  if(!text) return null;
-  const parts = text.replace(/,/g,';').split(';').map(x=>x.trim()).filter(Boolean);
-  if(parts.length<2) return null;
-  const lat=parseFloat(parts[0]), lon=parseFloat(parts[1]);
-  if(isFinite(lat)&&isFinite(lon)) return {lat,lon};
-  return null;
-}
-
-function parseNumber(val){ if(!val) return NaN; return parseFloat(val.replace(',','.')); }
 function fmt(n){ return n.toLocaleString(); }
 function stepToPercent(i){ return (i/(STEPS.length-1))*100; }
 
@@ -222,6 +223,7 @@ attachHandleDrag(handleMax, false);
 updateSliderUI();
 
 // Simple CSV parser for the known format
+// Simple CSV parser for the known format
 function parseCSV(txt) {
   const lines = txt.trim().split(/\r?\n/);
   const headers = lines[0].split(',').map(h => h.trim());
@@ -229,11 +231,14 @@ function parseCSV(txt) {
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',').map(c => c.trim());
     const o = {};
-    headers.forEach((h, j) => o[h] = cols[j] || '');
+    headers.forEach((h, j) => {
+      o[h] = cols[j] || '';
+    });
     rows.push(o);
   }
   return rows;
 }
+
 
 async function init() {
   try {
@@ -242,7 +247,6 @@ async function init() {
     const svgTxt = await svgRes.text();
     const parsed = parseCSV(csvTxt);
 
-    // Map directly from known headers
     cities = parsed.map(r => {
       const name = r['City name'];
       const lat = parseFloat(r.lat);
@@ -251,7 +255,6 @@ async function init() {
       return { name, lat, lon, pop };
     }).filter(c => c.name && isFinite(c.lat) && isFinite(c.lon) && c.pop);
 
-    // Insert SVG map
     document.getElementById('mapContainer').innerHTML = svgTxt;
     svgElement = document.querySelector('#mapContainer svg');
     const vb = svgElement.getAttribute('viewBox');
@@ -262,15 +265,16 @@ async function init() {
       svgElement.setAttribute('viewBox', '0 0 800 600');
     }
     svgElement.setAttribute('id', 'czMap');
+
+    // Remove inline fills that may conflict (safer sync)
     svgElement.querySelectorAll('path').forEach(p => {
-      p.setAttribute('stroke', '#ccc');
-      p.setAttribute('stroke-width', '0.8');
+      p.removeAttribute('fill');
     });
 
     const loader = document.getElementById('mapLoader');
     if (loader) loader.remove();
 
-    // Ensure initial map fill matches page background color
+    // Initial sync to page background
     syncMapFillWithBackground();
 
     renderCities();
@@ -364,7 +368,6 @@ function renderCities() {
   const maxPop = STEPS[Math.max(minIndex, maxIndex)];
   let filtered = cities.filter(c => c.pop >= minPop && c.pop <= maxPop);
 
-  // Sort by population (largest first)
   filtered.sort((a, b) => b.pop - a.pop);
 
   const positions = filtered.map(c => mapLatLonToSvg(c.lat, c.lon));
@@ -381,17 +384,17 @@ function renderCities() {
     const p = positions[idx];
     const r = radii[idx];
 
-    // Draw city dot
+    // City dot
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', p.x);
-    circle.setAttribute('cy', p.y);
+    circle.setAttribute('cx', Math.round(p.x));
+    circle.setAttribute('cy', Math.round(p.y));
     circle.setAttribute('r', r);
     circle.setAttribute('fill', 'red');
-    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke', getComputedStyle(document.documentElement).getPropertyValue('--outline-color').trim() || '#ffffff');
     circle.setAttribute('stroke-width', '0.5');
     g.appendChild(circle);
 
-    // Prepare label text
+    // Prepare label text (snap to whole pixels)
     const density = localDensityFactor(p.x, p.y, positions);
     const baseChars = 6;
     const maxCharsPerLine = Math.max(4, baseChars - density);
@@ -412,16 +415,19 @@ function renderCities() {
     // Try with normal font size, then smaller if needed
     for (let fontSize of [4, 3.5, 3]) {
       for (const off of offsets) {
+        const tx = Math.round(p.x + off.dx);
+        const ty = Math.round(p.y + off.dy);
+
         const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         tempText.setAttribute('class', 'city-label');
-        tempText.setAttribute('x', p.x + off.dx);
-        tempText.setAttribute('y', p.y + off.dy);
+        tempText.setAttribute('x', tx);
+        tempText.setAttribute('y', ty);
         tempText.setAttribute('text-anchor', 'middle');
         tempText.setAttribute('font-size', fontSize);
 
         lines.forEach((line, i) => {
           const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-          tspan.setAttribute('x', p.x + off.dx);
+          tspan.setAttribute('x', tx);
           tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
           tspan.textContent = line;
           tempText.appendChild(tspan);
@@ -455,18 +461,20 @@ function renderCities() {
       if (chosen) break;
     }
 
-    // Final fallback: force label above dot
+    // Final fallback: force label above dot (snapped)
     if (!chosen) {
+      const tx = Math.round(p.x);
+      const ty = Math.round(p.y - 10);
       chosen = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       chosen.setAttribute('class', 'city-label');
-      chosen.setAttribute('x', p.x);
-      chosen.setAttribute('y', p.y - 10);
+      chosen.setAttribute('x', tx);
+      chosen.setAttribute('y', ty);
       chosen.setAttribute('text-anchor', 'middle');
       chosen.setAttribute('font-size', 3);
 
       lines.forEach((line, i) => {
         const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-        tspan.setAttribute('x', p.x);
+        tspan.setAttribute('x', tx);
         tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
         tspan.textContent = line;
         chosen.appendChild(tspan);
@@ -481,10 +489,10 @@ function renderCities() {
     const lx = Math.max(chosenBBox.x1, Math.min(p.x, chosenBBox.x2));
     const ly = Math.max(chosenBBox.y1, Math.min(p.y, chosenBBox.y2));
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', lx);
-    line.setAttribute('y1', ly);
-    line.setAttribute('x2', p.x);
-    line.setAttribute('y2', p.y);
+    line.setAttribute('x1', Math.round(lx));
+    line.setAttribute('y1', Math.round(ly));
+    line.setAttribute('x2', Math.round(p.x));
+    line.setAttribute('y2', Math.round(p.y));
     line.setAttribute('class', 'leader');
     leaderGroup.appendChild(line);
   });
@@ -492,54 +500,89 @@ function renderCities() {
 
 init();
 
-/* ---------- Background color panel logic ---------- */
+/* ---------- Background color & contrast logic ---------- */
 const bgPicker = document.getElementById('bgColorPicker');
 const colorBtns = document.querySelectorAll('.color-btn');
 
-function setBackground(color) {
-  // Page background
-  document.body.style.background = color;
-  document.querySelector('.wrap').style.background = color;
-
-  // SVG background
-  if (svgElement) {
-    svgElement.querySelectorAll('path').forEach(p => {
-      p.setAttribute('fill', color);
-    });
+function parseRgbOrHexToRgb(color) {
+  if (color.startsWith('#')) {
+    const bigint = parseInt(color.slice(1), 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
   }
+  const m = color.match(/\d+/g);
+  if (!m) return [0,0,0];
+  return m.map(Number).slice(0,3);
+}
+function getLuminance(color) {
+  const [r,g,b] = parseRgbOrHexToRgb(color);
+  return (0.299*r + 0.587*g + 0.114*b) / 255;
 }
 
-
-function syncMapFill(color) {
+function setLabelStrokeForBackground(color) {
+  const lum = getLuminance(color);
   if (!svgElement) return;
-  // Fill all land paths in the imported SVG with chosen color
-  svgElement.querySelectorAll('path').forEach(p => {
-    p.setAttribute('fill', color);
-  });
-  // If the SVG has rects used as background, match them too
-  svgElement.querySelectorAll('rect').forEach(r => {
-    if (!r.hasAttribute('fill') || r.getAttribute('fill') !== 'none') {
-      r.setAttribute('fill', color);
+  svgElement.querySelectorAll('.city-label').forEach(lbl => {
+    if (lum > 0.5) {
+      // Light background → dark text, no halo
+      lbl.removeAttribute('stroke');
+      lbl.removeAttribute('stroke-width');
+    } else {
+      // Dark background → subtle black halo
+      lbl.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+      lbl.setAttribute('stroke-width', '0.6');
     }
   });
 }
 
-function syncMapFillWithBackground() {
-  const computedBodyBg = getComputedStyle(document.body).backgroundColor;
-  // If .wrap still has gradient, we'll set it to a solid to match body color
-  const wrap = document.querySelector('.wrap');
-  const wrapBg = getComputedStyle(wrap).backgroundImage;
-  if (wrapBg && wrapBg !== 'none') {
-    // Align wrap to body bg on load for consistency
-    wrap.style.background = computedBodyBg;
+function setCssOutlineColor(color) {
+  const lum = getLuminance(color);
+  const outline = lum > 0.5 ? '#000000' : '#ffffff';
+  document.documentElement.style.setProperty('--outline-color', outline);
+  setLabelStrokeForBackground(color);
+}
+
+function setBackground(color) {
+  // Solid background on body and wrap (avoid gradient mismatch)
+  document.body.style.background = color;
+  document.querySelector('.wrap').style.background = color;
+
+  // Map background (fill all paths and non-transparent rects)
+  if (svgElement) {
+    svgElement.querySelectorAll('path').forEach(p => p.setAttribute('fill', color));
+    svgElement.querySelectorAll('rect').forEach(r => {
+      if (!r.hasAttribute('fill') || r.getAttribute('fill') !== 'none') {
+        r.setAttribute('fill', color);
+      }
+    });
   }
-  syncMapFill(computedBodyBg);
+
+  // Update outline/leader color via CSS variable and label stroke
+  setCssOutlineColor(color);
+}
+
+function syncMapFillWithBackground() {
+  const bg = getComputedStyle(document.body).backgroundColor;
+  // Normalize wrap to solid color to match body
+  const wrap = document.querySelector('.wrap');
+  wrap.style.background = bg;
+
+  // Fill SVG background
+  if (svgElement) {
+    svgElement.querySelectorAll('path').forEach(p => p.setAttribute('fill', bg));
+    svgElement.querySelectorAll('rect').forEach(r => {
+      if (!r.hasAttribute('fill') || r.getAttribute('fill') !== 'none') {
+        r.setAttribute('fill', bg);
+      }
+    });
+  }
+
+  // Set outline color variable and adjust label stroke
+  setCssOutlineColor(bg);
 }
 
 bgPicker.addEventListener('input', e => {
   setBackground(e.target.value);
 });
-
 colorBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     const color = btn.getAttribute('data-color');
