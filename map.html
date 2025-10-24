@@ -299,40 +299,56 @@ const CANDIDATE_OFFSETS = [
   {dx:0, dy:24, anchor:'bottom-far'}
 ];
 
-function renderCities(){
-  if(!svgElement) return;
-  let g = svgElement.querySelector('#dotGroup');
-  if(!g){ g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.id='dotGroup'; svgElement.appendChild(g); }
-  while(g.firstChild) g.removeChild(g.firstChild);
+function rectInsideViewBox(rect, viewBox, pad = 0) {
+  return (
+    rect.x1 >= viewBox.x - pad &&
+    rect.y1 >= viewBox.y - pad &&
+    rect.x2 <= viewBox.x + viewBox.width + pad &&
+    rect.y2 <= viewBox.y + viewBox.height + pad
+  );
+}
 
-  const leaderGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  leaderGroup.setAttribute('id','leaderGroup');
+function renderCities() {
+  if (!svgElement) return;
+  let g = svgElement.querySelector('#dotGroup');
+  if (!g) {
+    g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.id = 'dotGroup';
+    svgElement.appendChild(g);
+  }
+  while (g.firstChild) g.removeChild(g.firstChild);
+
+  const leaderGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  leaderGroup.setAttribute('id', 'leaderGroup');
   g.appendChild(leaderGroup);
 
-  const labelGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  labelGroup.setAttribute('id','labelGroup');
+  const labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  labelGroup.setAttribute('id', 'labelGroup');
   g.appendChild(labelGroup);
 
   const minPop = STEPS[Math.min(minIndex, maxIndex)];
   const maxPop = STEPS[Math.max(minIndex, maxIndex)];
-  const filtered = cities.filter(c=>c.pop>=minPop && c.pop<=maxPop);
+  let filtered = cities.filter(c => c.pop >= minPop && c.pop <= maxPop);
 
-  const positions = filtered.map(c=>mapLatLonToSvg(c.lat, c.lon));
-  const radii = filtered.map(c=>radiusForPopulation(c.pop));
+  // Sort by population descending → big cities first
+  filtered.sort((a, b) => b.pop - a.pop);
 
-  const dotRects = positions.map((p, i)=>{
+  const positions = filtered.map(c => mapLatLonToSvg(c.lat, c.lon));
+  const radii = filtered.map(c => radiusForPopulation(c.pop));
+
+  const dotRects = positions.map((p, i) => {
     const r = radii[i];
     return { x1: p.x - r - 1, y1: p.y - r - 1, x2: p.x + r + 1, y2: p.y + r + 1 };
   });
 
   const placedRects = [];
 
-  filtered.forEach((city, idx)=>{
+  filtered.forEach((city, idx) => {
     const p = positions[idx];
     const r = radii[idx];
 
     // Draw city dot
-    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', p.x);
     circle.setAttribute('cy', p.y);
     circle.setAttribute('r', r);
@@ -350,15 +366,24 @@ function renderCities(){
     let chosen = null;
     let chosenBBox = null;
 
-    for(const off of CANDIDATE_OFFSETS){
-      const tempText = document.createElementNS('http://www.w3.org/2000/svg','text');
-      tempText.setAttribute('class','city-label');
+    // Try candidate offsets + dynamic expansion
+    const offsets = [...CANDIDATE_OFFSETS];
+    for (let dist = 20; dist <= 40; dist += 10) {
+      offsets.push({ dx: dist, dy: 0 });
+      offsets.push({ dx: -dist, dy: 0 });
+      offsets.push({ dx: 0, dy: dist });
+      offsets.push({ dx: 0, dy: -dist });
+    }
+
+    for (const off of offsets) {
+      const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      tempText.setAttribute('class', 'city-label');
       tempText.setAttribute('x', p.x + off.dx);
       tempText.setAttribute('y', p.y + off.dy);
-      tempText.setAttribute('text-anchor','middle');
+      tempText.setAttribute('text-anchor', 'middle');
 
-      lines.forEach((line,i)=>{
-        const tspan = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+      lines.forEach((line, i) => {
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
         tspan.setAttribute('x', p.x + off.dx);
         tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
         tspan.textContent = line;
@@ -372,14 +397,17 @@ function renderCities(){
       const paddedRect = { x1: rect.x1 - PAD, y1: rect.y1 - PAD, x2: rect.x2 + PAD, y2: rect.y2 + PAD };
 
       let collides = false;
-      for(const rct of placedRects){
-        if(rectIntersects(paddedRect, rct, 0)){ collides = true; break; }
+      for (const rct of placedRects) {
+        if (rectIntersects(paddedRect, rct, 0)) { collides = true; break; }
       }
-      for(let j=0;j<dotRects.length;j++){
-        if(rectIntersects(paddedRect, dotRects[j], 0)){ collides = true; break; }
+      for (let j = 0; j < dotRects.length && !collides; j++) {
+        if (rectIntersects(paddedRect, dotRects[j], 0)) { collides = true; break; }
+      }
+      if (!collides && !rectInsideViewBox(paddedRect, svgViewBox, 0)) {
+        collides = true;
       }
 
-      if(!collides){
+      if (!collides) {
         chosen = tempText;
         chosenBBox = paddedRect;
         break;
@@ -388,40 +416,24 @@ function renderCities(){
       }
     }
 
-    // fallback if no position found
-    if(!chosen){
-      const off = {dx:0, dy:-12};
-      chosen = document.createElementNS('http://www.w3.org/2000/svg','text');
-      chosen.setAttribute('class','city-label');
-      chosen.setAttribute('x', p.x + off.dx);
-      chosen.setAttribute('y', p.y + off.dy);
-      chosen.setAttribute('text-anchor','middle');
-      lines.forEach((line,i)=>{
-        const tspan = document.createElementNS('http://www.w3.org/2000/svg','tspan');
-        tspan.setAttribute('x', p.x + off.dx);
-        tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
-        tspan.textContent = line;
-        chosen.appendChild(tspan);
-      });
-      labelGroup.appendChild(chosen);
-      const bbox = chosen.getBBox();
-      chosenBBox = bboxToRect(bbox);
-    }
+    // If no safe placement found → skip label
+    if (!chosen) return;
 
     placedRects.push(chosenBBox);
 
-    // Always draw leader line
+    // Draw leader line
     const lx = Math.max(chosenBBox.x1, Math.min(p.x, chosenBBox.x2));
     const ly = Math.max(chosenBBox.y1, Math.min(p.y, chosenBBox.y2));
-    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', lx);
     line.setAttribute('y1', ly);
     line.setAttribute('x2', p.x);
     line.setAttribute('y2', p.y);
-    line.setAttribute('class','leader');
+    line.setAttribute('class', 'leader');
     leaderGroup.appendChild(line);
   });
 }
+
 
 
 init();
