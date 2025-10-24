@@ -224,7 +224,18 @@
 </style>
 </head>
 <body>
-<div class="wrap" role="application" aria-label="Czech Cities Quiz">
+<div id="difficultyScreen" style="text-align:center;max-width:500px;margin:auto;">
+  <h1>Czech Cities Quiz</h1>
+  <p>Select difficulty level (1 = easiest, 4 = hardest)</p>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
+    <button class="btn" onclick="startQuiz(1)">Level 1</button>
+    <button class="btn" onclick="startQuiz(2)">Level 2</button>
+    <button class="btn" onclick="startQuiz(3)">Level 3</button>
+    <button class="btn" onclick="startQuiz(4)">Level 4</button>
+  </div>
+</div>
+
+<div class="wrap" id="quizWrap" style="display:none" role="application" aria-label="Czech Cities Quiz">
   <div class="left">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div>
@@ -266,10 +277,17 @@
           <div style="font-size:13px;color:var(--muted)">Question</div>
           <div style="font-size:18px;font-weight:700" id="questionTitle">—</div>
         </div>
-        <div style="text-align:right">
-          <div class="meta">Score</div>
-          <div style="font-size:18px;font-weight:700" id="scoreDisplay">0</div>
-        </div>
+		<div style="display:flex;align-items:center;gap:20px;">
+		  <div>
+			<div class="meta">Level</div>
+			<div style="font-size:16px;font-weight:600" id="levelLabel">—</div>
+		  </div>
+		  <div style="text-align:right">
+			<div class="meta">Score</div>
+			<div style="font-size:18px;font-weight:700" id="scoreDisplay">0</div>
+		  </div>
+		</div>
+
       </div>
 
       <div class="choices" id="choices"></div>
@@ -309,6 +327,15 @@ const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
 const CSV_URL = 'https://vita2048.github.io/Quiz/cz.csv';
 const TOTAL_QUESTIONS = 30;
 const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
+let difficulty = 1; // default
+
+function startQuiz(level) {
+  difficulty = level;
+  document.getElementById('levelLabel').textContent = "Level " + level;
+  document.getElementById('difficultyScreen').style.display = 'none';
+  document.getElementById('quizWrap').style.display = 'grid';
+  init();
+}
 
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a;}
 function toLatLon(text){
@@ -475,14 +502,37 @@ function renderDotForCity(city){
 }
 
 function buildOptionsForIndex(i){
-  const main=quizCities[i];
-  const others=cities.filter(c=>c.name!==main.name)
-    .map(o=>({name:o.name,d: hav({lat:main.lat,lon:main.lon},{lat:o.lat,lon:o.lon})}))
-    .sort((a,b)=>a.d-b.d)
-    .slice(0,3).map(o=>o.name);
-  const opts=shuffle([main.name,...others]);
-  answers[i].options=opts; return opts;
+  const main = quizCities[i];
+  let sorted = cities.filter(c => c.name !== main.name)
+    .map(o => ({
+      name:o.name,
+      d: hav({lat:main.lat,lon:main.lon},{lat:o.lat,lon:o.lon})
+    }))
+    .sort((a,b)=>a.d-b.d);
+
+  let others;
+  if (difficulty === 1) {
+    // fairly close, but not the absolute closest
+    others = sorted.slice(5, 8).map(o=>o.name);
+  } else if (difficulty === 2) {
+    // closer: near‑neighbors, but not the top 3
+    others = sorted.slice(3, 6).map(o=>o.name);
+  } else if (difficulty === 3) {
+    // very close: almost like level 4, but slightly looser
+    others = sorted.slice(1, 4).map(o=>o.name);
+  } else {
+    // level 4: hardest, absolute closest
+    others = sorted.slice(0, 3).map(o=>o.name);
+  }
+
+  const opts = shuffle([main.name, ...others]);
+  answers[i].options = opts;
+  return opts;
 }
+
+
+
+
 
 function clearExtraAnnotations() {
   if (!svgElement) return;
@@ -506,6 +556,10 @@ clearExtraAnnotations();
   scoreDisplay.textContent=score;
 }
 
+function clamp(val, min, max) {
+  return Math.min(Math.max(val, min), max);
+}
+
 function renderExtraDotsAndLabels(mainCity, options, correctName) {
   if (!svgElement) return;
   const ns = 'http://www.w3.org/2000/svg';
@@ -517,16 +571,14 @@ function renderExtraDotsAndLabels(mainCity, options, correctName) {
   }
   while (g.firstChild) g.removeChild(g.firstChild);
 
-  // Collect all cities to show: correct + distractors
   const showCities = options.map(name => cities.find(c => c.name === name)).filter(Boolean);
 
-  // Track used label positions to avoid overlap
   const usedPositions = [];
+  const bb = svgElement.getBBox(); // bounding box of the map
 
-  showCities.forEach((city, idx) => {
+  showCities.forEach(city => {
     const p = mapLatLonToSvg(city.lat, city.lon);
 
-    // Dot
     const c = document.createElementNS(ns, 'circle');
     c.setAttribute('cx', p.x);
     c.setAttribute('cy', p.y);
@@ -536,19 +588,24 @@ function renderExtraDotsAndLabels(mainCity, options, correctName) {
     c.setAttribute('stroke-width', '1');
     g.appendChild(c);
 
-    // Label position offset
+    // initial label offset
     let lx = p.x + 15;
     let ly = p.y - 10;
 
-    // Adjust to avoid overlap with previous labels
+    // clamp inside map boundaries with padding
+    const pad = 10;
+    lx = clamp(lx, bb.x + pad, bb.x + bb.width - pad);
+    ly = clamp(ly, bb.y + pad, bb.y + bb.height - pad);
+
+    // avoid overlap with previous labels
     let tries = 0;
     while (usedPositions.some(pos => Math.abs(pos.x - lx) < 40 && Math.abs(pos.y - ly) < 16) && tries < 10) {
-      ly += 16; // push label down
+      ly += 16;
+      ly = clamp(ly, bb.y + pad, bb.y + bb.height - pad);
       tries++;
     }
     usedPositions.push({ x: lx, y: ly });
 
-    // Line
     const line = document.createElementNS(ns, 'line');
     line.setAttribute('x1', p.x);
     line.setAttribute('y1', p.y);
@@ -558,7 +615,6 @@ function renderExtraDotsAndLabels(mainCity, options, correctName) {
     line.setAttribute('stroke-width', '1');
     g.appendChild(line);
 
-    // Label
     const text = document.createElementNS(ns, 'text');
     text.setAttribute('x', lx);
     text.setAttribute('y', ly);
@@ -569,6 +625,7 @@ function renderExtraDotsAndLabels(mainCity, options, correctName) {
     g.appendChild(text);
   });
 }
+
 
 
 function selectChoice(el){
@@ -605,7 +662,11 @@ btnNext.onclick=()=>{
 };
 
 
-btnRestart.onclick=()=>location.reload();
+btnRestart.onclick = () => {
+  document.getElementById('quizWrap').style.display = 'none';
+  document.getElementById('difficultyScreen').style.display = 'block';
+};
+btnPlayAgain.onclick = btnRestart.onclick;
 
 function finishQuiz(){
   summaryPanel.style.display='block';
