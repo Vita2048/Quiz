@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Czech Cities Quiz — 30 Questions</title>
+<title>Czech Cities Quiz — 20 Questions</title>
 <style>
   :root{
     --bg:#0f1724;
@@ -240,10 +240,10 @@
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div>
         <h1>Czech Cities Quiz</h1>
-        <div class="meta">Find the city shown by the flashing dot. 30 random cities per session.</div>
+        <div class="meta">Find the city shown by the flashing dot. 20 random cities per session.</div>
       </div>
       <div id="top-actions" style="text-align:right">
-        <div class="meta" id="progressText">Question 0/30</div>
+        <div class="meta" id="progressText">Question 0/20</div>
         <div style="height:6px"></div>
         <div class="progress" style="width:260px;">
           <div style="font-size:12px;color:var(--muted);width:110px">Progress</div>
@@ -301,7 +301,7 @@
     <div class="summary" id="summaryPanel" style="display:none;">
       <h2>Quiz summary</h2>
       <div class="bigscore">
-        <div class="score" id="finalScore">0 / 30</div>
+        <div class="score" id="finalScore">0 / 20</div>
         <div>
           <div class="meta">Percentage</div>
           <div style="font-size:20px;font-weight:700" id="finalPct">0%</div>
@@ -325,7 +325,7 @@
 */
 const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
 const CSV_URL = 'https://vita2048.github.io/Quiz/cz.csv';
-const TOTAL_QUESTIONS = 30;
+const TOTAL_QUESTIONS = 20;
 const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
 let difficulty = 1; // default
 
@@ -664,8 +664,14 @@ function selectChoice(el){
   if (chosen !== correct) {
   // Show all distractors + correct city with labels
   renderExtraDotsAndLabels(quizCities[currentIndex], answers[currentIndex].options, correct);
+}
+
+  // 👇 NEW: if this was the last question, finish immediately
+  if (currentIndex === quizCities.length - 1) {
+    finishQuiz();
   }
 }
+
 
 
 btnNext.onclick=()=>{
