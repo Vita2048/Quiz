@@ -484,7 +484,15 @@ function buildOptionsForIndex(i){
   answers[i].options=opts; return opts;
 }
 
+function clearExtraAnnotations() {
+  if (!svgElement) return;
+  const g = svgElement.querySelector('#extraGroup');
+  if (g) g.innerHTML = '';
+}
+
+
 function renderQuestion(){
+clearExtraAnnotations();
   if(currentIndex>=quizCities.length){finishQuiz();return;}
   btnNext.disabled=true; choicesDiv.innerHTML='';
   const c=quizCities[currentIndex]; renderDotForCity(c);
@@ -497,6 +505,71 @@ function renderQuestion(){
   });
   scoreDisplay.textContent=score;
 }
+
+function renderExtraDotsAndLabels(mainCity, options, correctName) {
+  if (!svgElement) return;
+  const ns = 'http://www.w3.org/2000/svg';
+  let g = svgElement.querySelector('#extraGroup');
+  if (!g) {
+    g = document.createElementNS(ns, 'g');
+    g.id = 'extraGroup';
+    svgElement.appendChild(g);
+  }
+  while (g.firstChild) g.removeChild(g.firstChild);
+
+  // Collect all cities to show: correct + distractors
+  const showCities = options.map(name => cities.find(c => c.name === name)).filter(Boolean);
+
+  // Track used label positions to avoid overlap
+  const usedPositions = [];
+
+  showCities.forEach((city, idx) => {
+    const p = mapLatLonToSvg(city.lat, city.lon);
+
+    // Dot
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', p.x);
+    c.setAttribute('cy', p.y);
+    c.setAttribute('r', city.name === correctName ? 8 : 5);
+    c.setAttribute('fill', city.name === correctName ? 'limegreen' : 'red');
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', '1');
+    g.appendChild(c);
+
+    // Label position offset
+    let lx = p.x + 15;
+    let ly = p.y - 10;
+
+    // Adjust to avoid overlap with previous labels
+    let tries = 0;
+    while (usedPositions.some(pos => Math.abs(pos.x - lx) < 40 && Math.abs(pos.y - ly) < 16) && tries < 10) {
+      ly += 16; // push label down
+      tries++;
+    }
+    usedPositions.push({ x: lx, y: ly });
+
+    // Line
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', p.x);
+    line.setAttribute('y1', p.y);
+    line.setAttribute('x2', lx);
+    line.setAttribute('y2', ly - 4);
+    line.setAttribute('stroke', '#ccc');
+    line.setAttribute('stroke-width', '1');
+    g.appendChild(line);
+
+    // Label
+    const text = document.createElementNS(ns, 'text');
+    text.setAttribute('x', lx);
+    text.setAttribute('y', ly);
+    text.setAttribute('fill', '#fff');
+    text.setAttribute('font-size', '12px');
+    text.setAttribute('font-family', 'sans-serif');
+    text.textContent = city.name;
+    g.appendChild(text);
+  });
+}
+
 
 function selectChoice(el){
   // clear previous selection
@@ -517,6 +590,11 @@ function selectChoice(el){
 
   if(chosen===correct) score++;
   scoreDisplay.textContent=score;
+  
+  if (chosen !== correct) {
+  // Show all distractors + correct city with labels
+  renderExtraDotsAndLabels(quizCities[currentIndex], answers[currentIndex].options, correct);
+  }
 }
 
 
