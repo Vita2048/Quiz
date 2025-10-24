@@ -18,7 +18,8 @@
   #mapContainer { width:100%; height:100%; }
   #mapContainer svg { width:100%; height:100%; display:block; }
 
-  svg#czMap path { stroke:#cccccc; stroke-width:0.8; fill:#0b1220; }
+  /* Keep original look of map strokes; fill will be set via JS to match page background */
+  svg#czMap path { stroke:#cccccc; stroke-width:0.8; }
 
   text.city-label {
     fill:#fff; font-size:4px; font-family:sans-serif; text-anchor:middle;
@@ -27,6 +28,7 @@
 
   .leader { stroke: rgba(255,255,255,0.65); stroke-width: 0.6; stroke-linecap: round; fill: none; opacity:0.9; }
 
+  /* ORIGINAL population filter styles — unchanged */
   .filter-overlay {
     position:absolute; top:14px; left:14px; background:#0b1220; border:1px solid rgba(255,255,255,0.08);
     border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:10px;
@@ -47,28 +49,57 @@
   .handle:active { cursor:grabbing; }
   .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
   #mapLoader { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#9aa4b2; text-align:center; padding:10px; }
+
+  /* NEW: right-side background color panel */
+  .bg-panel {
+    position:absolute; top:14px; right:14px; background:#0b1220; border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:10px;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.5); z-index:100; min-width:220px;
+  }
+  .bg-title { font-size:13px; color:#9aa4b2; }
+  .bg-row { display:flex; align-items:center; gap:10px; }
+  .color-options { display:flex; gap:8px; flex-wrap:wrap; }
+  .color-btn { width:24px; height:24px; border-radius:50%; border:2px solid #fff; cursor:pointer; }
+  .color-input { flex:1; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="map-holder">
+    <!-- Population filter (unchanged) -->
     <div class="filter-overlay" role="group" aria-label="Population filter">
       <div class="filter-header">
         <div>Population filter</div>
       </div>
       <div class="filter-values">
-<div>Min: <span id="minVal">3,000</span></div>
-<div>Max: <span id="maxVal">2,000,000</span></div>
-
+        <div>Min: <span id="minVal">3,000</span></div>
+        <div>Max: <span id="maxVal">2,000,000</span></div>
       </div>
       <div class="range" id="range">
         <div class="range-track"></div>
         <div class="range-fill" id="rangeFill" style="left:0%; width:100%;"></div>
-<div class="handle" id="handleMin" aria-label="Minimum population" role="slider" aria-valuemin="3000" aria-valuemax="2000000" aria-valuenow="3000"></div>
-<div class="handle" id="handleMax" aria-label="Maximum population" role="slider" aria-valuemin="3000" aria-valuemax="2000000" aria-valuenow="2000000"></div>
-
+        <div class="handle" id="handleMin" aria-label="Minimum population" role="slider" aria-valuemin="3000" aria-valuemax="2000000" aria-valuenow="3000"></div>
+        <div class="handle" id="handleMax" aria-label="Maximum population" role="slider" aria-valuemin="3000" aria-valuemax="2000000" aria-valuenow="2000000"></div>
         <div class="range-ticks" id="ticks"></div>
         <div class="sr" id="rangeSr" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- NEW: Background color panel -->
+    <div class="bg-panel" role="group" aria-label="Background color">
+      <div class="bg-title">Background color</div>
+      <div class="bg-row">
+        <input type="color" id="bgColorPicker" class="color-input" value="#071024" aria-label="Pick background color" />
+      </div>
+      <div class="color-options" aria-label="Preset colors">
+        <div class="color-btn" style="background:#071024" data-color="#071024" title="#071024"></div>
+        <div class="color-btn" style="background:#071824" data-color="#071824" title="#071824"></div>
+        <div class="color-btn" style="background:#0b1220" data-color="#0b1220" title="#0b1220"></div>
+        <div class="color-btn" style="background:#1e293b" data-color="#1e293b" title="#1e293b"></div>
+        <div class="color-btn" style="background:#111827" data-color="#111827" title="#111827"></div>
+        <div class="color-btn" style="background:#ffffff" data-color="#ffffff" title="#ffffff"></div>
+        <div class="color-btn" style="background:#f59e0b" data-color="#f59e0b" title="#f59e0b"></div>
+        <div class="color-btn" style="background:#3b82f6" data-color="#3b82f6" title="#3b82f6"></div>
       </div>
     </div>
 
@@ -83,7 +114,6 @@ const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
 const CSV_URL = 'https://vita2048.github.io/Quiz/geoname_czech_cities.csv';
 const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
 const STEPS = [3000, 5000, 10000, 15000, 20000, 30000, 50000, 100000, 1000000, 2000000];
-
 
 let cities = [];
 let svgElement = null;
@@ -240,12 +270,16 @@ async function init() {
     const loader = document.getElementById('mapLoader');
     if (loader) loader.remove();
 
+    // Ensure initial map fill matches page background color
+    syncMapFillWithBackground();
+
     renderCities();
   } catch (e) {
     const loader = document.getElementById('mapLoader');
     if (loader) loader.textContent = "Error: " + e.message;
   }
 }
+
 function wrapLabel(name, maxCharsPerLine){
   const words = name.split(/\s+/);
   const lines = [];
@@ -330,7 +364,7 @@ function renderCities() {
   const maxPop = STEPS[Math.max(minIndex, maxIndex)];
   let filtered = cities.filter(c => c.pop >= minPop && c.pop <= maxPop);
 
-  // Sort by population descending → big cities first
+  // Sort by population (largest first)
   filtered.sort((a, b) => b.pop - a.pop);
 
   const positions = filtered.map(c => mapLatLonToSvg(c.lat, c.lon));
@@ -366,7 +400,7 @@ function renderCities() {
     let chosen = null;
     let chosenBBox = null;
 
-    // Try candidate offsets + dynamic expansion
+    // Try candidate offsets
     const offsets = [...CANDIDATE_OFFSETS];
     for (let dist = 20; dist <= 40; dist += 10) {
       offsets.push({ dx: dist, dy: 0 });
@@ -375,49 +409,71 @@ function renderCities() {
       offsets.push({ dx: 0, dy: -dist });
     }
 
-    for (const off of offsets) {
-      const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      tempText.setAttribute('class', 'city-label');
-      tempText.setAttribute('x', p.x + off.dx);
-      tempText.setAttribute('y', p.y + off.dy);
-      tempText.setAttribute('text-anchor', 'middle');
+    // Try with normal font size, then smaller if needed
+    for (let fontSize of [4, 3.5, 3]) {
+      for (const off of offsets) {
+        const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        tempText.setAttribute('class', 'city-label');
+        tempText.setAttribute('x', p.x + off.dx);
+        tempText.setAttribute('y', p.y + off.dy);
+        tempText.setAttribute('text-anchor', 'middle');
+        tempText.setAttribute('font-size', fontSize);
+
+        lines.forEach((line, i) => {
+          const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+          tspan.setAttribute('x', p.x + off.dx);
+          tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
+          tspan.textContent = line;
+          tempText.appendChild(tspan);
+        });
+
+        labelGroup.appendChild(tempText);
+        const bbox = tempText.getBBox();
+        const rect = bboxToRect(bbox);
+        const PAD = 2;
+        const paddedRect = { x1: rect.x1 - PAD, y1: rect.y1 - PAD, x2: rect.x2 + PAD, y2: rect.y2 + PAD };
+
+        let collides = false;
+        for (const rct of placedRects) {
+          if (rectIntersects(paddedRect, rct, 0)) { collides = true; break; }
+        }
+        for (let j = 0; j < dotRects.length && !collides; j++) {
+          if (rectIntersects(paddedRect, dotRects[j], 0)) { collides = true; break; }
+        }
+        if (!collides && !rectInsideViewBox(paddedRect, svgViewBox, 0)) {
+          collides = true;
+        }
+
+        if (!collides) {
+          chosen = tempText;
+          chosenBBox = paddedRect;
+          break;
+        } else {
+          labelGroup.removeChild(tempText);
+        }
+      }
+      if (chosen) break;
+    }
+
+    // Final fallback: force label above dot
+    if (!chosen) {
+      chosen = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      chosen.setAttribute('class', 'city-label');
+      chosen.setAttribute('x', p.x);
+      chosen.setAttribute('y', p.y - 10);
+      chosen.setAttribute('text-anchor', 'middle');
+      chosen.setAttribute('font-size', 3);
 
       lines.forEach((line, i) => {
         const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-        tspan.setAttribute('x', p.x + off.dx);
+        tspan.setAttribute('x', p.x);
         tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
         tspan.textContent = line;
-        tempText.appendChild(tspan);
+        chosen.appendChild(tspan);
       });
-
-      labelGroup.appendChild(tempText);
-      const bbox = tempText.getBBox();
-      const rect = bboxToRect(bbox);
-      const PAD = 2;
-      const paddedRect = { x1: rect.x1 - PAD, y1: rect.y1 - PAD, x2: rect.x2 + PAD, y2: rect.y2 + PAD };
-
-      let collides = false;
-      for (const rct of placedRects) {
-        if (rectIntersects(paddedRect, rct, 0)) { collides = true; break; }
-      }
-      for (let j = 0; j < dotRects.length && !collides; j++) {
-        if (rectIntersects(paddedRect, dotRects[j], 0)) { collides = true; break; }
-      }
-      if (!collides && !rectInsideViewBox(paddedRect, svgViewBox, 0)) {
-        collides = true;
-      }
-
-      if (!collides) {
-        chosen = tempText;
-        chosenBBox = paddedRect;
-        break;
-      } else {
-        labelGroup.removeChild(tempText);
-      }
+      labelGroup.appendChild(chosen);
+      chosenBBox = bboxToRect(chosen.getBBox());
     }
-
-    // If no safe placement found → skip label
-    if (!chosen) return;
 
     placedRects.push(chosenBBox);
 
@@ -434,9 +490,63 @@ function renderCities() {
   });
 }
 
-
-
 init();
+
+/* ---------- Background color panel logic ---------- */
+const bgPicker = document.getElementById('bgColorPicker');
+const colorBtns = document.querySelectorAll('.color-btn');
+
+function setBackground(color) {
+  // Page background
+  document.body.style.background = color;
+  document.querySelector('.wrap').style.background = color;
+
+  // SVG background
+  if (svgElement) {
+    svgElement.querySelectorAll('path').forEach(p => {
+      p.setAttribute('fill', color);
+    });
+  }
+}
+
+
+function syncMapFill(color) {
+  if (!svgElement) return;
+  // Fill all land paths in the imported SVG with chosen color
+  svgElement.querySelectorAll('path').forEach(p => {
+    p.setAttribute('fill', color);
+  });
+  // If the SVG has rects used as background, match them too
+  svgElement.querySelectorAll('rect').forEach(r => {
+    if (!r.hasAttribute('fill') || r.getAttribute('fill') !== 'none') {
+      r.setAttribute('fill', color);
+    }
+  });
+}
+
+function syncMapFillWithBackground() {
+  const computedBodyBg = getComputedStyle(document.body).backgroundColor;
+  // If .wrap still has gradient, we'll set it to a solid to match body color
+  const wrap = document.querySelector('.wrap');
+  const wrapBg = getComputedStyle(wrap).backgroundImage;
+  if (wrapBg && wrapBg !== 'none') {
+    // Align wrap to body bg on load for consistency
+    wrap.style.background = computedBodyBg;
+  }
+  syncMapFill(computedBodyBg);
+}
+
+bgPicker.addEventListener('input', e => {
+  setBackground(e.target.value);
+});
+
+colorBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const color = btn.getAttribute('data-color');
+    bgPicker.value = color;
+    setBackground(color);
+  });
+});
 </script>
 </body>
 </html>
