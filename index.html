@@ -503,32 +503,45 @@ function renderDotForCity(city){
 
 function buildOptionsForIndex(i){
   const main = quizCities[i];
-  let sorted = cities.filter(c => c.name !== main.name)
+
+  // compute distances to all other cities
+  let withDist = cities.filter(c => c.name !== main.name)
     .map(o => ({
       name:o.name,
-      d: hav({lat:main.lat,lon:main.lon},{lat:o.lat,lon:o.lon})
-    }))
-    .sort((a,b)=>a.d-b.d);
+      d: hav(
+        {lat:main.lat, lon:main.lon},
+        {lat:o.lat, lon:o.lon}
+      )
+    }));
 
-  let others;
+  let pool;
   if (difficulty === 1) {
-    // fairly close, but not the absolute closest
-    others = sorted.slice(5, 8).map(o=>o.name);
+    // Level 1: distractors >= 100 km away
+    pool = withDist.filter(o => o.d >= 80);
   } else if (difficulty === 2) {
-    // closer: near‑neighbors, but not the top 3
-    others = sorted.slice(3, 6).map(o=>o.name);
+    // Level 2: distractors between 70–100 km
+    pool = withDist.filter(o => o.d >= 60 && o.d < 80);
   } else if (difficulty === 3) {
-    // very close: almost like level 4, but slightly looser
-    others = sorted.slice(1, 4).map(o=>o.name);
+    // Level 3: distractors between 50–70 km
+    pool = withDist.filter(o => o.d >= 35 && o.d < 60);
   } else {
-    // level 4: hardest, absolute closest
-    others = sorted.slice(0, 3).map(o=>o.name);
+    // Level 4: distractors < 50 km (hardest)
+    pool = withDist.filter(o => o.d < 35);
   }
+
+  // fallback: if not enough cities in pool, use closest available
+  if (pool.length < 3) {
+    pool = withDist.sort((a,b)=>a.d-b.d);
+  }
+
+  // pick 3 distractors from pool
+  const others = shuffle(pool).slice(0,3).map(o=>o.name);
 
   const opts = shuffle([main.name, ...others]);
   answers[i].options = opts;
   return opts;
 }
+
 
 
 
