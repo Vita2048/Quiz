@@ -57,14 +57,16 @@
         <div>Population filter</div>
       </div>
       <div class="filter-values">
-        <div>Min: <span id="minVal">5,000</span></div>
-        <div>Max: <span id="maxVal">2,000,000</span></div>
+<div>Min: <span id="minVal">3,000</span></div>
+<div>Max: <span id="maxVal">2,000,000</span></div>
+
       </div>
       <div class="range" id="range">
         <div class="range-track"></div>
         <div class="range-fill" id="rangeFill" style="left:0%; width:100%;"></div>
-        <div class="handle" id="handleMin" aria-label="Minimum population" role="slider" aria-valuemin="5000" aria-valuemax="2000000" aria-valuenow="5000"></div>
-        <div class="handle" id="handleMax" aria-label="Maximum population" role="slider" aria-valuemin="5000" aria-valuemax="2000000" aria-valuenow="2000000"></div>
+<div class="handle" id="handleMin" aria-label="Minimum population" role="slider" aria-valuemin="3000" aria-valuemax="2000000" aria-valuenow="3000"></div>
+<div class="handle" id="handleMax" aria-label="Maximum population" role="slider" aria-valuemin="3000" aria-valuemax="2000000" aria-valuenow="2000000"></div>
+
         <div class="range-ticks" id="ticks"></div>
         <div class="sr" id="rangeSr" aria-live="polite"></div>
       </div>
@@ -80,13 +82,14 @@
 const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
 const CSV_URL = 'https://vita2048.github.io/Quiz/geoname_czech_cities.csv';
 const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
-const STEPS = [5000, 10000, 15000, 20000, 30000, 50000, 100000, 1000000, 2000000];
+const STEPS = [3000, 5000, 10000, 15000, 20000, 30000, 50000, 100000, 1000000, 2000000];
+
 
 let cities = [];
 let svgElement = null;
 let svgViewBox = { x:0, y:0, width:800, height:600 };
 
-let minIndex = 0;
+let minIndex = 1;
 let maxIndex = STEPS.length - 1;
 const rangeEl = document.getElementById('range');
 const handleMin = document.getElementById('handleMin');
