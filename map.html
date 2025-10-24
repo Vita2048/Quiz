@@ -55,7 +55,6 @@
     <div class="filter-overlay" role="group" aria-label="Population filter">
       <div class="filter-header">
         <div>Population filter</div>
-        <div style="font-size:12px;">Discrete steps</div>
       </div>
       <div class="filter-values">
         <div>Min: <span id="minVal">5,000</span></div>
@@ -79,7 +78,7 @@
 
 <script>
 const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
-const CSV_URL = 'https://vita2048.github.io/Quiz/cz.csv';
+const CSV_URL = 'https://vita2048.github.io/Quiz/geoname_czech_cities.csv';
 const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
 const STEPS = [5000, 10000, 15000, 20000, 30000, 50000, 100000, 1000000, 2000000];
 
@@ -106,20 +105,7 @@ function toLatLon(text){
   if(isFinite(lat)&&isFinite(lon)) return {lat,lon};
   return null;
 }
-function parseCSVsmart(txt){
-  const lines = txt.trim().split(/\r?\n/).filter(Boolean);
-  if(!lines.length) return [];
-  const delim = (lines[0].includes(';') && !lines[0].includes(',')) ? ';' : ',';
-  const headers = lines[0].split(delim).map(h=>h.trim());
-  const rows=[];
-  for(let i=1;i<lines.length;i++){
-    const cols = lines[i].split(delim).map(c=>c.trim());
-    const o={};
-    for(let j=0;j<headers.length;j++) o[headers[j]]=cols[j]||'';
-    rows.push(o);
-  }
-  return rows;
-}
+
 function parseNumber(val){ if(!val) return NaN; return parseFloat(val.replace(',','.')); }
 function fmt(n){ return n.toLocaleString(); }
 function stepToPercent(i){ return (i/(STEPS.length-1))*100; }
@@ -202,53 +188,61 @@ attachHandleDrag(handleMin, true);
 attachHandleDrag(handleMax, false);
 updateSliderUI();
 
-async function init(){
-  try{
+// Simple CSV parser for the known format
+function parseCSV(txt) {
+  const lines = txt.trim().split(/\r?\n/);
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim());
+    const o = {};
+    headers.forEach((h, j) => o[h] = cols[j] || '');
+    rows.push(o);
+  }
+  return rows;
+}
+
+async function init() {
+  try {
     const [csvRes, svgRes] = await Promise.all([fetch(CSV_URL), fetch(SVG_URL)]);
     const csvTxt = await csvRes.text();
     const svgTxt = await svgRes.text();
-    const parsed = parseCSVsmart(csvTxt);
+    const parsed = parseCSV(csvTxt);
 
-    cities = parsed.map(r=>{
-      const name = r.city || r.City || r['City Name'] || r['name'] || r['Město'];
-      let lat=null, lon=null;
-      const combo = r['lat;lng']||r['lat;lon']||r['lat,lng']||r['latlon']||r['coords']||'';
-      const pair = toLatLon(combo);
-      if(pair){ lat=pair.lat; lon=pair.lon; }
-      else {
-        const la=parseNumber(r.lat||r.Lat||r.latitude||r.Latitude);
-        const lo=parseNumber(r.lng||r.lon||r.Lon||r.Longitude||r.longitude);
-        if(isFinite(la)&&isFinite(lo)){ lat=la; lon=lo; }
-      }
-      const pop = parseInt(r.population||r.Population||r.pop||r['POP']||0,10);
+    // Map directly from known headers
+    cities = parsed.map(r => {
+      const name = r['City name'];
+      const lat = parseFloat(r.lat);
+      const lon = parseFloat(r.lng);
+      const pop = parseInt(r.population, 10);
       return { name, lat, lon, pop };
-    }).filter(c=>c.name && isFinite(c.lat) && isFinite(c.lon) && c.pop);
+    }).filter(c => c.name && isFinite(c.lat) && isFinite(c.lon) && c.pop);
 
+    // Insert SVG map
     document.getElementById('mapContainer').innerHTML = svgTxt;
     svgElement = document.querySelector('#mapContainer svg');
     const vb = svgElement.getAttribute('viewBox');
-    if(vb){
-      const p = vb.split(/\s+|,/).map(Number).filter(n=>!isNaN(n));
-      if(p.length===4) svgViewBox = { x:p[0], y:p[1], width:p[2], height:p[3] };
+    if (vb) {
+      const p = vb.split(/\s+|,/).map(Number).filter(n => !isNaN(n));
+      if (p.length === 4) svgViewBox = { x: p[0], y: p[1], width: p[2], height: p[3] };
     } else {
-      svgElement.setAttribute('viewBox','0 0 800 600');
+      svgElement.setAttribute('viewBox', '0 0 800 600');
     }
-    svgElement.setAttribute('id','czMap');
-    svgElement.querySelectorAll('path').forEach(p=>{
-      p.setAttribute('stroke','#ccc');
-      p.setAttribute('stroke-width','0.8');
+    svgElement.setAttribute('id', 'czMap');
+    svgElement.querySelectorAll('path').forEach(p => {
+      p.setAttribute('stroke', '#ccc');
+      p.setAttribute('stroke-width', '0.8');
     });
 
     const loader = document.getElementById('mapLoader');
-    if(loader) loader.remove();
+    if (loader) loader.remove();
 
     renderCities();
-  }catch(e){
+  } catch (e) {
     const loader = document.getElementById('mapLoader');
-    if(loader) loader.textContent = "Error: " + e.message;
+    if (loader) loader.textContent = "Error: " + e.message;
   }
 }
-
 function wrapLabel(name, maxCharsPerLine){
   const words = name.split(/\s+/);
   const lines = [];
