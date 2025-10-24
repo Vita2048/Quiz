@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Czech Cities Population Map</title>
+<style>
+  html, body {
+    margin:0; padding:0;
+    height:100%; width:100%;
+    background:#071024; color:#fff;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  }
+
+  .wrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(180deg,#071024 0%, #071824 100%); }
+  .map-holder { position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  #mapContainer { width:100%; height:100%; }
+  #mapContainer svg { width:100%; height:100%; display:block; }
+
+  svg#czMap path { stroke:#cccccc; stroke-width:0.8; fill:#0b1220; }
+
+  text.city-label {
+    fill:#fff; font-size:4px; font-family:sans-serif; text-anchor:middle;
+    paint-order: stroke; stroke: rgba(0,0,0,0.6); stroke-width: 1px; pointer-events:none;
+  }
+
+  .leader { stroke: rgba(255,255,255,0.65); stroke-width: 0.6; stroke-linecap: round; fill: none; opacity:0.9; }
+
+  .filter-overlay {
+    position:absolute; top:14px; left:14px; background:#0b1220; border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:10px;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.5); z-index:100; min-width:260px;
+  }
+  .filter-header { display:flex; align-items:center; justify-content:space-between; font-size:13px; color:#9aa4b2; }
+  .filter-values { display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:600; }
+
+  .range { position:relative; height:32px; }
+  .range-track { position:absolute; top:50%; transform:translateY(-50%); left:0; right:0; height:8px;
+    background:rgba(255,255,255,0.12); border-radius:8px; }
+  .range-fill { position:absolute; top:50%; transform:translateY(-50%); height:8px;
+    background:linear-gradient(90deg, #22c1c3, #3b82f6); border-radius:8px; }
+  .range-ticks { position:absolute; left:0; right:0; top:100%; display:flex; justify-content:space-between;
+    padding-top:6px; font-size:11px; color:#9aa4b2; }
+  .handle { position:absolute; top:50%; transform:translate(-50%, -50%); width:14px; height:14px; border-radius:50%;
+    background:#fff; border:2px solid #22c1c3; cursor:grab; box-shadow:0 2px 6px rgba(0,0,0,0.4); touch-action:none; }
+  .handle:active { cursor:grabbing; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  #mapLoader { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#9aa4b2; text-align:center; padding:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="map-holder">
+    <div class="filter-overlay" role="group" aria-label="Population filter">
+      <div class="filter-header">
+        <div>Population filter</div>
+        <div style="font-size:12px;">Discrete steps</div>
+      </div>
+      <div class="filter-values">
+        <div>Min: <span id="minVal">5,000</span></div>
+        <div>Max: <span id="maxVal">2,000,000</span></div>
+      </div>
+      <div class="range" id="range">
+        <div class="range-track"></div>
+        <div class="range-fill" id="rangeFill" style="left:0%; width:100%;"></div>
+        <div class="handle" id="handleMin" aria-label="Minimum population" role="slider" aria-valuemin="5000" aria-valuemax="2000000" aria-valuenow="5000"></div>
+        <div class="handle" id="handleMax" aria-label="Maximum population" role="slider" aria-valuemin="5000" aria-valuemax="2000000" aria-valuenow="2000000"></div>
+        <div class="range-ticks" id="ticks"></div>
+        <div class="sr" id="rangeSr" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div id="mapContainer">
+      <div id="mapLoader">Loading map and cities…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
+const CSV_URL = 'https://vita2048.github.io/Quiz/cz.csv';
+const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
+const STEPS = [5000, 10000, 15000, 20000, 30000, 50000, 100000, 1000000, 2000000];
+
+let cities = [];
+let svgElement = null;
+let svgViewBox = { x:0, y:0, width:800, height:600 };
+
+let minIndex = 0;
+let maxIndex = STEPS.length - 1;
+const rangeEl = document.getElementById('range');
+const handleMin = document.getElementById('handleMin');
+const handleMax = document.getElementById('handleMax');
+const rangeFill = document.getElementById('rangeFill');
+const ticksEl = document.getElementById('ticks');
+const minValEl = document.getElementById('minVal');
+const maxValEl = document.getElementById('maxVal');
+const srEl = document.getElementById('rangeSr');
+
+function toLatLon(text){
+  if(!text) return null;
+  const parts = text.replace(/,/g,';').split(';').map(x=>x.trim()).filter(Boolean);
+  if(parts.length<2) return null;
+  const lat=parseFloat(parts[0]), lon=parseFloat(parts[1]);
+  if(isFinite(lat)&&isFinite(lon)) return {lat,lon};
+  return null;
+}
+function parseCSVsmart(txt){
+  const lines = txt.trim().split(/\r?\n/).filter(Boolean);
+  if(!lines.length) return [];
+  const delim = (lines[0].includes(';') && !lines[0].includes(',')) ? ';' : ',';
+  const headers = lines[0].split(delim).map(h=>h.trim());
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(delim).map(c=>c.trim());
+    const o={};
+    for(let j=0;j<headers.length;j++) o[headers[j]]=cols[j]||'';
+    rows.push(o);
+  }
+  return rows;
+}
+function parseNumber(val){ if(!val) return NaN; return parseFloat(val.replace(',','.')); }
+function fmt(n){ return n.toLocaleString(); }
+function stepToPercent(i){ return (i/(STEPS.length-1))*100; }
+
+function mapLatLonToSvg(lat, lon) {
+  const { minLat, maxLat, minLon, maxLon } = CZECH_BBOX;
+  const { x, y, width, height } = svgViewBox;
+  let fx = (lon - minLon) / (maxLon - minLon);
+  let fy = (lat - minLat) / (maxLat - minLat);
+  let cx = x + Math.min(Math.max(fx, 0), 1) * width;
+  let cy = y + (1 - Math.min(Math.max(fy, 0), 1)) * height;
+  return { x: cx, y: cy };
+}
+
+function renderTicks(){
+  ticksEl.innerHTML = '';
+  STEPS.forEach((v,i)=>{
+    const tick = document.createElement('div');
+    tick.style.flex = '1 1 auto';
+    tick.style.textAlign = i===0 ? 'left' : (i===STEPS.length-1 ? 'right' : 'center');
+    tick.textContent = v >= 1000000 ? (v/1000000)+'M' : (v >= 1000 ? (v/1000)+'k' : v);
+    ticksEl.appendChild(tick);
+  });
+}
+renderTicks();
+
+function updateSliderUI(){
+  const pctMin = stepToPercent(minIndex);
+  const pctMax = stepToPercent(maxIndex);
+  handleMin.style.left = pctMin + '%';
+  handleMax.style.left = pctMax + '%';
+  const left = Math.min(pctMin, pctMax);
+  const width = Math.abs(pctMax - pctMin);
+  rangeFill.style.left = left + '%';
+  rangeFill.style.width = width + '%';
+  const minPop = STEPS[Math.min(minIndex, maxIndex)];
+  const maxPop = STEPS[Math.max(minIndex, maxIndex)];
+  minValEl.textContent = fmt(minPop);
+  maxValEl.textContent = fmt(maxPop);
+  handleMin.setAttribute('aria-valuenow', String(minPop));
+  handleMax.setAttribute('aria-valuenow', String(maxPop));
+  srEl.textContent = `Population range ${fmt(minPop)} to ${fmt(maxPop)}`;
+}
+
+function attachHandleDrag(handle, isMin){
+  let dragging = false;
+  function onDown(e){
+    dragging = true;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('touchend', onUp);
+    e.preventDefault();
+  }
+  function clientX(e){
+    if(e.touches && e.touches[0]) return e.touches[0].clientX;
+    return e.clientX;
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const rect = rangeEl.getBoundingClientRect();
+    const x = clientX(e);
+    const rel = Math.min(Math.max((x - rect.left)/rect.width, 0), 1);
+    const idx = Math.round(rel * (STEPS.length - 1));
+    if(isMin){ minIndex = Math.min(idx, maxIndex); } else { maxIndex = Math.max(idx, minIndex); }
+    updateSliderUI();
+    renderCities();
+  }
+  function onUp(){
+    dragging = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+  }
+  handle.addEventListener('mousedown', onDown);
+  handle.addEventListener('touchstart', onDown, {passive:false});
+}
+attachHandleDrag(handleMin, true);
+attachHandleDrag(handleMax, false);
+updateSliderUI();
+
+async function init(){
+  try{
+    const [csvRes, svgRes] = await Promise.all([fetch(CSV_URL), fetch(SVG_URL)]);
+    const csvTxt = await csvRes.text();
+    const svgTxt = await svgRes.text();
+    const parsed = parseCSVsmart(csvTxt);
+
+    cities = parsed.map(r=>{
+      const name = r.city || r.City || r['City Name'] || r['name'] || r['Město'];
+      let lat=null, lon=null;
+      const combo = r['lat;lng']||r['lat;lon']||r['lat,lng']||r['latlon']||r['coords']||'';
+      const pair = toLatLon(combo);
+      if(pair){ lat=pair.lat; lon=pair.lon; }
+      else {
+        const la=parseNumber(r.lat||r.Lat||r.latitude||r.Latitude);
+        const lo=parseNumber(r.lng||r.lon||r.Lon||r.Longitude||r.longitude);
+        if(isFinite(la)&&isFinite(lo)){ lat=la; lon=lo; }
+      }
+      const pop = parseInt(r.population||r.Population||r.pop||r['POP']||0,10);
+      return { name, lat, lon, pop };
+    }).filter(c=>c.name && isFinite(c.lat) && isFinite(c.lon) && c.pop);
+
+    document.getElementById('mapContainer').innerHTML = svgTxt;
+    svgElement = document.querySelector('#mapContainer svg');
+    const vb = svgElement.getAttribute('viewBox');
+    if(vb){
+      const p = vb.split(/\s+|,/).map(Number).filter(n=>!isNaN(n));
+      if(p.length===4) svgViewBox = { x:p[0], y:p[1], width:p[2], height:p[3] };
+    } else {
+      svgElement.setAttribute('viewBox','0 0 800 600');
+    }
+    svgElement.setAttribute('id','czMap');
+    svgElement.querySelectorAll('path').forEach(p=>{
+      p.setAttribute('stroke','#ccc');
+      p.setAttribute('stroke-width','0.8');
+    });
+
+    const loader = document.getElementById('mapLoader');
+    if(loader) loader.remove();
+
+    renderCities();
+  }catch(e){
+    const loader = document.getElementById('mapLoader');
+    if(loader) loader.textContent = "Error: " + e.message;
+  }
+}
+
+function wrapLabel(name, maxCharsPerLine){
+  const words = name.split(/\s+/);
+  const lines = [];
+  let current = '';
+  words.forEach(w=>{
+    if(!current.length){ current = w; }
+    else if((current + ' ' + w).length <= maxCharsPerLine){
+      current += ' ' + w;
+    } else {
+      lines.push(current);
+      current = w;
+    }
+  });
+  if(current) lines.push(current);
+  return lines;
+}
+
+function localDensityFactor(px, py, points){
+  let count = 0;
+  const R = 18;
+  for(const q of points){
+    const dx = q.x - px, dy = q.y - py;
+    if(Math.sqrt(dx*dx + dy*dy) < R) count++;
+  }
+  return Math.min(3, count);
+}
+
+function radiusForPopulation(pop){
+  const value = Math.log10(Math.max(1, pop));
+  const r = (value - 3.5) * 2.2;
+  return Math.max(1.2, Math.min(10, r));
+}
+
+function rectIntersects(a, b, pad=0){
+  return !(a.x2 + pad < b.x1 - pad || a.x1 - pad > b.x2 + pad || a.y2 + pad < b.y1 - pad || a.y1 - pad > b.y2 + pad);
+}
+function bboxToRect(bbox){
+  return { x1: bbox.x, y1: bbox.y, x2: bbox.x + bbox.width, y2: bbox.y + bbox.height };
+}
+
+const CANDIDATE_OFFSETS = [
+  {dx:0, dy:-8, anchor:'top'},
+  {dx:0, dy:8, anchor:'bottom'},
+  {dx:14, dy:-10, anchor:'right-top'},
+  {dx:14, dy:4, anchor:'right'},
+  {dx:14, dy:14, anchor:'right-bottom'},
+  {dx:-14, dy:-10, anchor:'left-top'},
+  {dx:-14, dy:4, anchor:'left'},
+  {dx:-14, dy:14, anchor:'left-bottom'},
+  {dx:0, dy:-24, anchor:'top-far'},
+  {dx:0, dy:24, anchor:'bottom-far'}
+];
+
+function renderCities(){
+  if(!svgElement) return;
+  let g = svgElement.querySelector('#dotGroup');
+  if(!g){ g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.id='dotGroup'; svgElement.appendChild(g); }
+  while(g.firstChild) g.removeChild(g.firstChild);
+
+  const leaderGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  leaderGroup.setAttribute('id','leaderGroup');
+  g.appendChild(leaderGroup);
+
+  const labelGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  labelGroup.setAttribute('id','labelGroup');
+  g.appendChild(labelGroup);
+
+  const minPop = STEPS[Math.min(minIndex, maxIndex)];
+  const maxPop = STEPS[Math.max(minIndex, maxIndex)];
+  const filtered = cities.filter(c=>c.pop>=minPop && c.pop<=maxPop);
+
+  const positions = filtered.map(c=>mapLatLonToSvg(c.lat, c.lon));
+  const radii = filtered.map(c=>radiusForPopulation(c.pop));
+
+  const dotRects = positions.map((p, i)=>{
+    const r = radii[i];
+    return { x1: p.x - r - 1, y1: p.y - r - 1, x2: p.x + r + 1, y2: p.y + r + 1 };
+  });
+
+  const placedRects = [];
+
+  filtered.forEach((city, idx)=>{
+    const p = positions[idx];
+    const r = radii[idx];
+
+    // Draw city dot
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx', p.x);
+    circle.setAttribute('cy', p.y);
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', 'red');
+    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke-width', '0.5');
+    g.appendChild(circle);
+
+    // Prepare label text
+    const density = localDensityFactor(p.x, p.y, positions);
+    const baseChars = 6;
+    const maxCharsPerLine = Math.max(4, baseChars - density);
+    const lines = wrapLabel(city.name, maxCharsPerLine);
+
+    let chosen = null;
+    let chosenBBox = null;
+
+    for(const off of CANDIDATE_OFFSETS){
+      const tempText = document.createElementNS('http://www.w3.org/2000/svg','text');
+      tempText.setAttribute('class','city-label');
+      tempText.setAttribute('x', p.x + off.dx);
+      tempText.setAttribute('y', p.y + off.dy);
+      tempText.setAttribute('text-anchor','middle');
+
+      lines.forEach((line,i)=>{
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+        tspan.setAttribute('x', p.x + off.dx);
+        tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
+        tspan.textContent = line;
+        tempText.appendChild(tspan);
+      });
+
+      labelGroup.appendChild(tempText);
+      const bbox = tempText.getBBox();
+      const rect = bboxToRect(bbox);
+      const PAD = 2;
+      const paddedRect = { x1: rect.x1 - PAD, y1: rect.y1 - PAD, x2: rect.x2 + PAD, y2: rect.y2 + PAD };
+
+      let collides = false;
+      for(const rct of placedRects){
+        if(rectIntersects(paddedRect, rct, 0)){ collides = true; break; }
+      }
+      for(let j=0;j<dotRects.length;j++){
+        if(rectIntersects(paddedRect, dotRects[j], 0)){ collides = true; break; }
+      }
+
+      if(!collides){
+        chosen = tempText;
+        chosenBBox = paddedRect;
+        break;
+      } else {
+        labelGroup.removeChild(tempText);
+      }
+    }
+
+    // fallback if no position found
+    if(!chosen){
+      const off = {dx:0, dy:-12};
+      chosen = document.createElementNS('http://www.w3.org/2000/svg','text');
+      chosen.setAttribute('class','city-label');
+      chosen.setAttribute('x', p.x + off.dx);
+      chosen.setAttribute('y', p.y + off.dy);
+      chosen.setAttribute('text-anchor','middle');
+      lines.forEach((line,i)=>{
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+        tspan.setAttribute('x', p.x + off.dx);
+        tspan.setAttribute('dy', i === 0 ? '0' : '1.05em');
+        tspan.textContent = line;
+        chosen.appendChild(tspan);
+      });
+      labelGroup.appendChild(chosen);
+      const bbox = chosen.getBBox();
+      chosenBBox = bboxToRect(bbox);
+    }
+
+    placedRects.push(chosenBBox);
+
+    // Always draw leader line
+    const lx = Math.max(chosenBBox.x1, Math.min(p.x, chosenBBox.x2));
+    const ly = Math.max(chosenBBox.y1, Math.min(p.y, chosenBBox.y2));
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', lx);
+    line.setAttribute('y1', ly);
+    line.setAttribute('x2', p.x);
+    line.setAttribute('y2', p.y);
+    line.setAttribute('class','leader');
+    leaderGroup.appendChild(line);
+  });
+}
+
+
+init();
+</script>
+</body>
+</html>
