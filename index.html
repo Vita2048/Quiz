@@ -27,7 +27,7 @@
   }
   .wrap{
     width:100%;
-    max-width:1100px;
+    max-width:1230px;
     background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
     border-radius:14px;
     box-shadow: 0 6px 30px rgba(2,6,23,0.6);
@@ -63,14 +63,11 @@
     justify-content:center;
     min-height:420px;
   }
-  svg#czMap {
-    width:100%;
-    height:auto;
-    max-height:600px;
-    border-radius:6px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.0));
-    box-shadow: 0 4px 18px rgba(2,6,23,0.6) inset;
-  }
+  svg#czMap path {
+  stroke: #cccccc !important;
+  stroke-width: 0.8 !important;
+  fill: #0b1220; /* keep background dark */
+}
 
 
 .flash-dot {
@@ -144,8 +141,16 @@
   }
   .choice:hover{ transform:translateY(-4px); box-shadow: 0 8px 18px rgba(2,6,23,0.5); }
   .choice.selected{ outline:2px solid rgba(34,193,195,0.18); box-shadow: 0 10px 22px rgba(34,193,195,0.06); }
-  .choice.correct{ border:1px solid rgba(34,193,195,0.5); background:linear-gradient(180deg, rgba(34,193,195,0.06), rgba(59,130,246,0.02)); }
-  .choice.wrong{ border:1px solid rgba(255,80,80,0.4); background:linear-gradient(180deg, rgba(255,80,80,0.04), rgba(255,255,255,0.01)); }
+.choice.correct {
+  border: 2px solid #22c55e; /* bright green */
+  background: #14532d;
+  color: #d1fae5;
+}
+.choice.wrong {
+  border: 2px solid #ef4444; /* bright red */
+  background: #7f1d1d;
+  color: #fee2e2;
+}
 
   .controls{
     display:flex;
@@ -272,7 +277,7 @@
 
       <div class="controls">
         <button class="btn secondary" id="btnRestart">Restart</button>
-        <button class="btn" id="btnNext" disabled>Confirm & Next</button>
+        <button class="btn" id="btnNext" disabled>Next</button>
       </div>
     </div>
 
@@ -293,9 +298,6 @@
       </div>
     </div>
 
-    <div class="footer">
-      Map SVG: <code>vita2048.github.io/Quiz/cz.svg</code> · Cities CSV: <code>vita2048.github.io/Quiz/cz.csv</code>
-    </div>
   </div>
 </div>
 
@@ -400,6 +402,8 @@ function parseNumber(val) {
     // --- inject SVG ---
     mapContainer.innerHTML=svgTxt;
     svgElement=mapContainer.querySelector('svg');
+	// after svgElement is set
+
     if(!svgElement) throw new Error('SVG missing root <svg>.');
     const vb=svgElement.getAttribute('viewBox');
     if(vb){
@@ -409,7 +413,10 @@ function parseNumber(val) {
       svgElement.setAttribute('viewBox','0 0 800 600');
     }
     svgElement.setAttribute('id','czMap');
-
+svgElement.querySelectorAll('path').forEach(p=>{
+  p.setAttribute('stroke','#cccccc');
+  p.setAttribute('stroke-width','0.8');
+});
     shuffle(cities);
     quizCities=cities.slice(0,TOTAL_QUESTIONS);
     answers=quizCities.map(c=>({city:c,correct:c.name,chosen:null,options:[]}));
@@ -493,24 +500,33 @@ function renderQuestion(){
 }
 
 function selectChoice(el){
+  // clear previous selection
   document.querySelectorAll('.choice').forEach(c=>c.classList.remove('selected'));
-  el.classList.add('selected'); btnNext.disabled=false;
-}
+  el.classList.add('selected');
+  btnNext.disabled=false;
 
-btnNext.onclick=()=>{
-  const sel=document.querySelector('.choice.selected'); if(!sel) return;
-  const chosen=sel.textContent, correct=answers[currentIndex].correct;
-  answers[currentIndex].chosen=chosen;
-  const correctEls=document.querySelectorAll('.choice');
-  correctEls.forEach(c=>{
-    if(c.textContent===correct)c.classList.add('correct');
-    if(c.textContent===chosen&&chosen!==correct)c.classList.add('wrong');
+  const chosen = el.textContent;
+  const correct = answers[currentIndex].correct;
+  answers[currentIndex].chosen = chosen;
+
+  // mark immediately
+  document.querySelectorAll('.choice').forEach(c=>{
+    if(c.textContent===correct) c.classList.add('correct');
+    if(c.textContent===chosen && chosen!==correct) c.classList.add('wrong');
     c.style.pointerEvents='none';
   });
+
   if(chosen===correct) score++;
   scoreDisplay.textContent=score;
-  setTimeout(()=>{currentIndex++; renderQuestion(); updateProgress();},700);
+}
+
+
+btnNext.onclick=()=>{
+  currentIndex++;
+  renderQuestion();
+  updateProgress();
 };
+
 
 btnRestart.onclick=()=>location.reload();
 
