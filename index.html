@@ -38,7 +38,6 @@
     padding:20px;
   }
 
-  /* Responsive: stack on small screens */
   @media (max-width:980px){
     .wrap { grid-template-columns: 1fr; padding:12px; }
     .right { order:2; }
@@ -65,9 +64,8 @@
   svg#czMap path {
   stroke: #cccccc !important;
   stroke-width: 0.8 !important;
-  fill: #0b1220; /* keep background dark */
+  fill: #0b1220;
 }
-
 
 .flash-dot {
   animation: flash 1s infinite;
@@ -77,7 +75,6 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
-
 
   .right{
     background:var(--card);
@@ -141,12 +138,12 @@
   .choice:hover{ transform:translateY(-4px); box-shadow: 0 8px 18px rgba(2,6,23,0.5); }
   .choice.selected{ outline:2px solid rgba(34,193,195,0.18); box-shadow: 0 10px 22px rgba(34,193,195,0.06); }
 .choice.correct {
-  border: 2px solid #22c55e; /* bright green */
+  border: 2px solid #22c55e;
   background: #14532d;
   color: #d1fae5;
 }
 .choice.wrong {
-  border: 2px solid #ef4444; /* bright red */
+  border: 2px solid #ef4444;
   background: #7f1d1d;
   color: #fee2e2;
 }
@@ -218,7 +215,6 @@
     margin-top:10px;
   }
 
-  /* small helper */
   .center { display:flex; align-items:center; justify-content:center; }
   .hint { color:var(--muted); font-size:13px; }
 </style>
@@ -254,7 +250,6 @@
 
     <div class="map-holder" aria-hidden="false">
       <div id="mapContainer" style="width:100%;max-width:900px;">
-        <!-- SVG map will be injected here -->
         <div id="mapLoader" class="center" style="padding:34px;">
           <div style="text-align:center">
             <div class="hint">Loading map and cities...</div>
@@ -277,16 +272,16 @@
           <div style="font-size:13px;color:var(--muted)">Question</div>
           <div style="font-size:18px;font-weight:700" id="questionTitle">—</div>
         </div>
-		<div style="display:flex;align-items:center;gap:20px;">
-		  <div>
-			<div class="meta">Level</div>
-			<div style="font-size:16px;font-weight:600" id="levelLabel">—</div>
-		  </div>
-		  <div style="text-align:right">
-			<div class="meta">Score</div>
-			<div style="font-size:18px;font-weight:700" id="scoreDisplay">0</div>
-		  </div>
-		</div>
+        <div style="display:flex;align-items:center;gap:20px;">
+          <div>
+            <div class="meta">Level</div>
+            <div style="font-size:16px;font-weight:600" id="levelLabel">—</div>
+          </div>
+          <div style="text-align:right">
+            <div class="meta">Score</div>
+            <div style="font-size:18px;font-weight:700" id="scoreDisplay">0</div>
+          </div>
+        </div>
 
       </div>
 
@@ -319,15 +314,16 @@
 </div>
 
 <script>
-
 /*
-  Czech Cities Quiz — fixed CSV parser
+  Complete quiz script with CSV (City name,population,lat,lng), population filters per difficulty,
+  and a robust annotation placement system to avoid label/dot/line overlaps and crossings.
 */
+
 const SVG_URL = 'https://vita2048.github.io/Quiz/cz.svg';
-const CSV_URL = 'https://vita2048.github.io/Quiz/cz.csv';
+const CSV_URL = 'https://vita2048.github.io/Quiz/geoname_czech_cities.csv';
 const TOTAL_QUESTIONS = 20;
 const CZECH_BBOX = { minLat:48.55, maxLat:51.06, minLon:12.09, maxLon:18.87 };
-let difficulty = 1; // default
+let difficulty = 1;
 
 function startQuiz(level) {
   difficulty = level;
@@ -337,21 +333,11 @@ function startQuiz(level) {
   init();
 }
 
-function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a;}
-function toLatLon(text){
-  if(!text) return null;
-  const parts = text.replace(/,/g,';').split(';').map(x=>x.trim()).filter(Boolean);
-  if(parts.length<2) return null;
-  const lat=parseFloat(parts[0]), lon=parseFloat(parts[1]);
-  if(isFinite(lat)&&isFinite(lon)) return {lat,lon};
-  return null;
-}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 
-// --- 🧩 updated parser handles semicolon or comma separated files gracefully
 function parseCSVsmart(txt){
   const lines = txt.trim().split(/\r?\n/).filter(Boolean);
   if(!lines.length) return [];
-  // auto-detect delimiter
   const delim = (lines[0].includes(';') && !lines[0].includes(',')) ? ';' : ',';
   const headers = lines[0].split(delim).map(h=>h.trim());
   const rows=[];
@@ -372,7 +358,8 @@ function hav(a,b){
   return 2*R*Math.atan2(Math.sqrt(A),Math.sqrt(1-A));
 }
 
-let cities=[],quizCities=[],currentIndex=0,score=0,answers=[],svgElement=null,svgViewBox={x:0,y:0,width:800,height:600};
+/* --- state and DOM refs --- */
+let cities=[], citiesFiltered=[], quizCities=[], currentIndex=0, score=0, answers=[], svgElement=null, svgViewBox={x:0,y:0,width:800,height:600};
 const mapContainer=document.getElementById('mapContainer'),
       mapLoader=document.getElementById('mapLoader'),
       progressText=document.getElementById('progressText'),
@@ -389,63 +376,45 @@ const mapContainer=document.getElementById('mapContainer'),
       btnPlayAgain=document.getElementById('btnPlayAgain'),
       btnExport=document.getElementById('btnExport');
 
+/* --- init / load --- */
 async function init(){
   try{
+    clearAllStateBeforeInit();
     const [csvRes,svgRes]=await Promise.all([fetch(CSV_URL),fetch(SVG_URL)]);
     const csvTxt=await csvRes.text(), svgTxt=await svgRes.text();
     const parsed=parseCSVsmart(csvTxt);
 
-    // --- identify columns flexibly ---
-cities = parsed.map(r => {
-  const name = r.city || r.City || r['City Name'] || r['name'] || r['NAME'] || r['Město'];
-
-  let lat = null, lon = null;
-
-  // try coordinate pairs first
-  const combo = r['lat;lng'] || r['lat;lon'] || r['lat,lng'] || r['latlon'] || r['coords'] || '';
-  const pair = toLatLon(combo);
-  if (pair) {
-    lat = pair.lat;
-    lon = pair.lon;
-  } else {
-    const la = parseNumber(r.lat || r.Lat || r.latitude || r.Latitude);
-    const lo = parseNumber(r.lng || r.lon || r.Lon || r.Longitude || r.longitude);
-    if (isFinite(la) && isFinite(lo)) {
-      lat = la;
-      lon = lo;
-    }
-  }
-
-  return { name, lat, lon };
-}).filter(c => c.name && isFinite(c.lat) && isFinite(c.lon));
-function parseNumber(val) {
-  if (!val) return NaN;
-  return parseFloat(val.replace(',', '.'));
-}
+    cities = parsed.map(r=>{
+      const name = r['City name'] || r['City'] || r['city'] || r['Name'] || r['name'] || r['Město'] || '';
+      const popRaw = r['population'] || r['Population'] || r['pop'] || '';
+      const latRaw = r['lat'] || r['latitude'] || r['Lat'] || '';
+      const lonRaw = r['lng'] || r['lon'] || r['longitude'] || r['Lon'] || '';
+      const population = parseInt(String(popRaw||'').replace(/\s+/g,'').replace(/,/g,''),10);
+      const lat = parseFloat(String(latRaw||'').replace(',', '.'));
+      const lon = parseFloat(String(lonRaw||'').replace(',', '.'));
+      return { name: name||'', population: isFinite(population)?population:NaN, lat: isFinite(lat)?lat:NaN, lon: isFinite(lon)?lon:NaN };
+    }).filter(c => c.name && isFinite(c.lat) && isFinite(c.lon));
 
     if(!cities.length) throw new Error('No valid cities parsed from CSV.');
 
-    // --- inject SVG ---
-    mapContainer.innerHTML=svgTxt;
-    svgElement=mapContainer.querySelector('svg');
-	// after svgElement is set
-
+    mapContainer.innerHTML = svgTxt;
+    svgElement = mapContainer.querySelector('svg');
     if(!svgElement) throw new Error('SVG missing root <svg>.');
-    const vb=svgElement.getAttribute('viewBox');
+    const vb = svgElement.getAttribute('viewBox');
     if(vb){
       const p=vb.split(/\s+|,/).map(Number).filter(n=>!isNaN(n));
       if(p.length===4) svgViewBox={x:p[0],y:p[1],width:p[2],height:p[3]};
-    }else{
-      svgElement.setAttribute('viewBox','0 0 800 600');
-    }
+    } else svgElement.setAttribute('viewBox','0 0 800 600');
     svgElement.setAttribute('id','czMap');
-svgElement.querySelectorAll('path').forEach(p=>{
-  p.setAttribute('stroke','#cccccc');
-  p.setAttribute('stroke-width','0.8');
-});
-    shuffle(cities);
-    quizCities=cities.slice(0,TOTAL_QUESTIONS);
-    answers=quizCities.map(c=>({city:c,correct:c.name,chosen:null,options:[]}));
+    svgElement.querySelectorAll('path').forEach(p=>{ p.setAttribute('stroke','#cccccc'); p.setAttribute('stroke-width','0.8'); });
+
+    applyPopulationFilter();
+    if(citiesFiltered.length < 4) throw new Error('Not enough cities after applying population filter for this difficulty level.');
+
+    shuffle(citiesFiltered);
+    quizCities = citiesFiltered.slice(0, Math.min(TOTAL_QUESTIONS, citiesFiltered.length));
+    answers = quizCities.map(c=>({city:c,correct:c.name,chosen:null,options:[]}));
+
     mapLoader.style.display='none';
     currentIndex=0; score=0; scoreDisplay.textContent=score;
     updateProgress(); renderQuestion();
@@ -455,43 +424,68 @@ svgElement.querySelectorAll('path').forEach(p=>{
   }
 }
 
+function clearAllStateBeforeInit(){
+  summaryPanel.style.display='none';
+  finalScore.textContent='0 / 20';
+  finalPct.textContent='0%';
+  breakdown.innerHTML='';
+  cities = []; citiesFiltered = []; quizCities = []; answers = [];
+  currentIndex = 0; score = 0;
+  const prevSvg = mapContainer.querySelector('svg');
+  if(prevSvg){
+    const dot = prevSvg.querySelector('#dotGroup'); if(dot) dot.remove();
+    const extra = prevSvg.querySelector('#extraGroup'); if(extra) extra.remove();
+  }
+  progressText.textContent='Question 0/20';
+  progressBar.style.width='0%';
+  choicesDiv.innerHTML='';
+  scoreDisplay.textContent='0';
+  mapLoader.style.display='block';
+  mapLoader.innerHTML = `<div style="text-align:center"><div class="hint">Loading map and cities...</div><div style="margin-top:10px"><small class="meta">If nothing loads, check CORS or network access to the two files.</small></div></div>`;
+}
+
+/* --- population filtering by difficulty --- */
+function applyPopulationFilter(){
+  let minPop = 0;
+  if (difficulty === 1) minPop = 10000;
+  else if (difficulty === 2) minPop = 7000;
+  else if (difficulty === 3) minPop = 5000;
+  else minPop = 0;
+
+  citiesFiltered = cities.filter(c => isFinite(c.population) && c.population >= minPop);
+  if (citiesFiltered.length < 4 && minPop === 0) citiesFiltered = cities.slice();
+}
+
+/* --- progress / map helpers --- */
 function updateProgress(){
   progressText.textContent=`Question ${Math.min(currentIndex+1,TOTAL_QUESTIONS)}/${TOTAL_QUESTIONS}`;
   progressBar.style.width=Math.round((currentIndex/TOTAL_QUESTIONS)*100)+'%';
   questionTitle.textContent='Which city is this?';
 }
 
-function mapLatLonToSvg(lat, lon) {
+function mapLatLonToSvg(lat, lon){
   const { minLat, maxLat, minLon, maxLon } = CZECH_BBOX;
   const { x, y, width, height } = svgViewBox;
-
-  // Basic linear projection from lat/lon to SVG coords
   let fx = (lon - minLon) / (maxLon - minLon);
   let fy = (lat - minLat) / (maxLat - minLat);
   let cx = x + Math.min(Math.max(fx, 0), 1) * width;
   let cy = y + (1 - Math.min(Math.max(fy, 0), 1)) * height;
-
-  // Light “keep-inside” correction using outline’s bounding box
   const path = svgElement?.querySelector('path');
   if (path) {
     const bb = path.getBBox();
-    // add small padding to ensure visibility inside the border
     const pad = 5;
     cx = Math.min(Math.max(cx, bb.x + pad), bb.x + bb.width - pad);
     cy = Math.min(Math.max(cy, bb.y + pad), bb.y + bb.height - pad);
   }
-
   return { x: cx, y: cy };
 }
 
-
-
-
+/* --- dot rendering --- */
 function renderDotForCity(city){
   if(!svgElement) return;
   const ns='http://www.w3.org/2000/svg';
   let g=svgElement.querySelector('#dotGroup');
-  if(!g){g=document.createElementNS(ns,'g');g.id='dotGroup';svgElement.appendChild(g);}
+  if(!g){ g=document.createElementNS(ns,'g');g.id='dotGroup';svgElement.appendChild(g);}
   while(g.firstChild) g.removeChild(g.firstChild);
   const p=mapLatLonToSvg(city.lat,city.lon);
   const c=document.createElementNS(ns,'circle');
@@ -501,66 +495,195 @@ function renderDotForCity(city){
   c.setAttribute('class','flash-dot'); g.appendChild(c);
 }
 
+/* --- options building --- */
 function buildOptionsForIndex(i){
   const main = quizCities[i];
-
-  // compute distances to all other cities
-  let withDist = cities.filter(c => c.name !== main.name)
-    .map(o => ({
-      name:o.name,
-      d: hav(
-        {lat:main.lat, lon:main.lon},
-        {lat:o.lat, lon:o.lon}
-      )
-    }));
-
+  let withDist = citiesFiltered.filter(c => c.name !== main.name)
+    .map(o => ({ name:o.name, d: hav({lat:main.lat, lon:main.lon}, {lat:o.lat, lon:o.lon}) }));
   let pool;
-  if (difficulty === 1) {
-    // Level 1: distractors >= 100 km away
-    pool = withDist.filter(o => o.d >= 80);
-  } else if (difficulty === 2) {
-    // Level 2: distractors between 70–100 km
-    pool = withDist.filter(o => o.d >= 60 && o.d < 80);
-  } else if (difficulty === 3) {
-    // Level 3: distractors between 50–70 km
-    pool = withDist.filter(o => o.d >= 35 && o.d < 60);
-  } else {
-    // Level 4: distractors < 50 km (hardest)
-    pool = withDist.filter(o => o.d < 35);
-  }
-
-  // fallback: if not enough cities in pool, use closest available
-  if (pool.length < 3) {
-    pool = withDist.sort((a,b)=>a.d-b.d);
-  }
-
-  // pick 3 distractors from pool
+  if (difficulty === 1) pool = withDist.filter(o => o.d >= 80);
+  else if (difficulty === 2) pool = withDist.filter(o => o.d >= 60 && o.d < 80);
+  else if (difficulty === 3) pool = withDist.filter(o => o.d >= 35 && o.d < 60);
+  else pool = withDist.filter(o => o.d < 35);
+  if (pool.length < 3) pool = withDist.sort((a,b)=>a.d-b.d);
   const others = shuffle(pool).slice(0,3).map(o=>o.name);
-
   const opts = shuffle([main.name, ...others]);
   answers[i].options = opts;
   return opts;
 }
 
+/* --- START: GEOMETRY AND ANNOTATION PLACEMENT LOGIC --- */
 
-
-
-
-
-function clearExtraAnnotations() {
-  if (!svgElement) return;
-  const g = svgElement.querySelector('#extraGroup');
-  if (g) g.innerHTML = '';
+// --- Robust Geometry Helpers ---
+function distSq(p1, p2) { const dx = p1.x-p2.x, dy = p1.y-p2.y; return dx*dx+dy*dy; }
+function lineSegmentIntersects(p1, q1, p2, q2) {
+    function orientation(p, q, r) {
+        const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+        if (Math.abs(val) < 1e-9) return 0;
+        return (val > 0) ? 1 : 2;
+    }
+    function onSegment(p, q, r) {
+        return (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) &&
+                q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y));
+    }
+    const o1 = orientation(p1, q1, p2), o2 = orientation(p1, q1, q2),
+          o3 = orientation(p2, q2, p1), o4 = orientation(p2, q2, q1);
+    if (o1 !== o2 && o3 !== o4) return true;
+    if (o1 === 0 && onSegment(p1, p2, q1)) return true;
+    if (o2 === 0 && onSegment(p1, q2, q1)) return true;
+    if (o3 === 0 && onSegment(p2, p1, q2)) return true;
+    if (o4 === 0 && onSegment(p2, q1, q2)) return true;
+    return false;
+}
+function rectIntersectsRect(r1, r2) {
+    return !(r2.x >= r1.x + r1.w || r2.x + r2.w <= r1.x || r2.y >= r1.y + r1.h || r2.y + r2.h <= r1.y);
+}
+function lineIntersectsRect(p1, p2, r) {
+    return lineSegmentIntersects(p1, p2, {x:r.x, y:r.y}, {x:r.x+r.w, y:r.y}) ||
+           lineSegmentIntersects(p1, p2, {x:r.x+r.w, y:r.y}, {x:r.x+r.w, y:r.y+r.h}) ||
+           lineSegmentIntersects(p1, p2, {x:r.x+r.w, y:r.y+r.h}, {x:r.x, y:r.y+r.h}) ||
+           lineSegmentIntersects(p1, p2, {x:r.x, y:r.y+r.h}, {x:r.x, y:r.y});
+}
+function lineIntersectsCircle(p1, p2, c) {
+    const l2 = distSq(p1, p2);
+    if (l2 === 0) return distSq(p1, c) <= c.r*c.r;
+    let t = Math.max(0, Math.min(1, ((c.x - p1.x) * (p2.x - p1.x) + (c.y - p1.y) * (p2.y - p1.y)) / l2));
+    const closest = { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+    return distSq(closest, c) <= c.r * c.r;
+}
+function rectIntersectsCircle(r, c) {
+    const testX = Math.max(r.x, Math.min(c.x, r.x + r.w));
+    const testY = Math.max(r.y, Math.min(c.y, r.y + r.h));
+    return distSq({x:testX, y:testY}, c) <= c.r * c.r;
 }
 
+// --- Improved Annotation Placement ---
+function clearExtraAnnotations(){ if(!svgElement) return; const g=svgElement.querySelector('#extraGroup'); if(g) g.innerHTML=''; }
 
+function renderExtraDotsAndLabels(mainCity, options, correctName){
+  if (!svgElement) return;
+  const ns = 'http://www.w3.org/2000/svg';
+  let g = svgElement.querySelector('#extraGroup');
+  if (!g) { g = document.createElementNS(ns, 'g'); g.id = 'extraGroup'; svgElement.appendChild(g); }
+  g.innerHTML = '';
+
+  const showCities = options.map(name => citiesFiltered.find(c => c.name === name)).filter(Boolean);
+  if(!showCities.length) return;
+
+  const mapBbox = svgElement.getBBox();
+  const pad = 8, fontSize = 12, labelPadX = 5, labelPadY = 3, approxCharW = 6.5;
+
+  const occupied = { rects: [], circles: [], lines: [] };
+  
+  const cityData = showCities.map(city => ({
+      city, p: mapLatLonToSvg(city.lat, city.lon),
+      isCorrect: city.name === correctName,
+      dotRadius: city.name === correctName ? 8 : 5
+  }));
+
+  for (const data of cityData) {
+      occupied.circles.push({ x: data.p.x, y: data.p.y, r: data.dotRadius + 8, isMain: false });
+  }
+  
+  for(const data of cityData) {
+    const { city, p, isCorrect, dotRadius } = data;
+    let candidates = [];
+    const angles = Array.from({length: 12}, (_, i) => i * (Math.PI / 6));
+    const radii = [25, 40, 60, 85, 115];
+
+    for (const r of radii) {
+      for (const a of angles) {
+        const textW = Math.max(30, city.name.length * approxCharW);
+        const labelW = textW + labelPadX * 2;
+        const labelH = fontSize + labelPadY * 2;
+        
+        const candidateX = p.x + Math.cos(a) * r;
+        const candidateY = p.y + Math.sin(a) * r;
+
+        let lx, ly;
+        // ***FIX***: Smartly anchor the label box based on the angle
+        if (Math.abs(Math.cos(a)) > Math.abs(Math.sin(a))) { // More horizontal
+            lx = (Math.cos(a) > 0) ? candidateX : candidateX - labelW;
+            ly = candidateY - labelH / 2;
+        } else { // More vertical
+            lx = candidateX - labelW / 2;
+            ly = (Math.sin(a) > 0) ? candidateY : candidateY - labelH;
+        }
+
+        lx = Math.max(mapBbox.x + pad, Math.min(lx, mapBbox.x + mapBbox.width - labelW - pad));
+        ly = Math.max(mapBbox.y + pad, Math.min(ly, mapBbox.y + mapBbox.height - labelH - pad));
+
+        const rect = { x: lx, y: ly, w: labelW, h: labelH };
+        
+        // Find closest connection point on the final rectangle
+        const points = [
+            {x: rect.x, y: rect.y + rect.h / 2}, {x: rect.x + rect.w, y: rect.y + rect.h / 2},
+            {x: rect.x + rect.w / 2, y: rect.y}, {x: rect.x + rect.w / 2, y: rect.y + rect.h}
+        ];
+        let lineEnd = points[0];
+        let min_d = distSq(p, lineEnd);
+        for(let i = 1; i < points.length; i++) {
+            const d = distSq(p, points[i]);
+            if (d < min_d) { min_d = d; lineEnd = points[i]; }
+        }
+
+        const line = { p1: p, p2: lineEnd };
+        let penalty = Math.sqrt(distSq(line.p1, line.p2)) * 0.1;
+
+        for(const ob of occupied.rects) if(rectIntersectsRect(rect, ob)) penalty += 1000;
+        for(const ob of occupied.circles) if(rectIntersectsCircle(rect, ob)) penalty += 1000;
+        for(const ob of occupied.lines) if(lineSegmentIntersects(line.p1, line.p2, ob.p1, ob.p2)) penalty += 500;
+        for(const ob of occupied.rects) if(lineIntersectsRect(line.p1, line.p2, ob)) penalty += 500;
+        for(const ob of occupied.circles) if(lineIntersectsCircle(line.p1, line.p2, ob)) penalty += 500;
+
+        candidates.push({ rect, line, penalty });
+      }
+    }
+
+    candidates.sort((a, b) => a.penalty - b.penalty);
+    const best = candidates[0];
+
+    occupied.rects.push(best.rect);
+    occupied.lines.push(best.line);
+    
+    const lineEl = document.createElementNS(ns,'line');
+    lineEl.setAttribute('x1', best.line.p1.x); lineEl.setAttribute('y1', best.line.p1.y);
+    lineEl.setAttribute('x2', best.line.p2.x); lineEl.setAttribute('y2', best.line.p2.y);
+    lineEl.setAttribute('stroke', '#9aa4b2'); lineEl.setAttribute('stroke-width', '1');
+    g.appendChild(lineEl);
+    
+    const textEl = document.createElementNS(ns,'text');
+    textEl.setAttribute('x', best.rect.x + labelPadX);
+    textEl.setAttribute('y', best.rect.y + fontSize + (labelPadY/2));
+    textEl.setAttribute('fill', '#e6eef6');
+    textEl.setAttribute('font-size', fontSize);
+    textEl.setAttribute('font-family', 'Inter, sans-serif');
+    textEl.setAttribute('font-weight', isCorrect ? '600' : '400');
+    textEl.textContent = city.name;
+    g.appendChild(textEl);
+  }
+
+  for (const data of cityData) {
+    const { p, isCorrect, dotRadius } = data;
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
+    dot.setAttribute('r', dotRadius); dot.setAttribute('fill', isCorrect ? '#22c55e' : '#ef4444');
+    dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '1.5');
+    g.appendChild(dot);
+  }
+}
+/* --- END: GEOMETRY AND ANNOTATION PLACEMENT LOGIC --- */
+
+/* --- selection and UI --- */
 function renderQuestion(){
-clearExtraAnnotations();
-  if(currentIndex>=quizCities.length){finishQuiz();return;}
+  clearExtraAnnotations();
+  const dotGroup = svgElement.querySelector('#dotGroup');
+  if(dotGroup) dotGroup.style.display = 'block';
+  if(currentIndex>=quizCities.length){ finishQuiz(); return; }
   btnNext.disabled=true; choicesDiv.innerHTML='';
   const c=quizCities[currentIndex]; renderDotForCity(c);
   const opts=buildOptionsForIndex(currentIndex);
-  opts.forEach((o,i)=>{
+  opts.forEach(o=>{
     const d=document.createElement('div');
     d.className='choice'; d.textContent=o; d.tabIndex=0;
     d.onclick=()=>selectChoice(d); d.onkeypress=(e)=>{if(e.key==='Enter')selectChoice(d)};
@@ -569,110 +692,38 @@ clearExtraAnnotations();
   scoreDisplay.textContent=score;
 }
 
-function clamp(val, min, max) {
-  return Math.min(Math.max(val, min), max);
-}
-
-function renderExtraDotsAndLabels(mainCity, options, correctName) {
-  if (!svgElement) return;
-  const ns = 'http://www.w3.org/2000/svg';
-  let g = svgElement.querySelector('#extraGroup');
-  if (!g) {
-    g = document.createElementNS(ns, 'g');
-    g.id = 'extraGroup';
-    svgElement.appendChild(g);
-  }
-  while (g.firstChild) g.removeChild(g.firstChild);
-
-  const showCities = options.map(name => cities.find(c => c.name === name)).filter(Boolean);
-
-  const usedPositions = [];
-  const bb = svgElement.getBBox(); // bounding box of the map
-
-  showCities.forEach(city => {
-    const p = mapLatLonToSvg(city.lat, city.lon);
-
-    const c = document.createElementNS(ns, 'circle');
-    c.setAttribute('cx', p.x);
-    c.setAttribute('cy', p.y);
-    c.setAttribute('r', city.name === correctName ? 8 : 5);
-    c.setAttribute('fill', city.name === correctName ? 'limegreen' : 'red');
-    c.setAttribute('stroke', '#fff');
-    c.setAttribute('stroke-width', '1');
-    g.appendChild(c);
-
-    // initial label offset
-    let lx = p.x + 15;
-    let ly = p.y - 10;
-
-    // clamp inside map boundaries with padding
-    const pad = 10;
-    lx = clamp(lx, bb.x + pad, bb.x + bb.width - pad);
-    ly = clamp(ly, bb.y + pad, bb.y + bb.height - pad);
-
-    // avoid overlap with previous labels
-    let tries = 0;
-    while (usedPositions.some(pos => Math.abs(pos.x - lx) < 40 && Math.abs(pos.y - ly) < 16) && tries < 10) {
-      ly += 16;
-      ly = clamp(ly, bb.y + pad, bb.y + bb.height - pad);
-      tries++;
-    }
-    usedPositions.push({ x: lx, y: ly });
-
-    const line = document.createElementNS(ns, 'line');
-    line.setAttribute('x1', p.x);
-    line.setAttribute('y1', p.y);
-    line.setAttribute('x2', lx);
-    line.setAttribute('y2', ly - 4);
-    line.setAttribute('stroke', '#ccc');
-    line.setAttribute('stroke-width', '1');
-    g.appendChild(line);
-
-    const text = document.createElementNS(ns, 'text');
-    text.setAttribute('x', lx);
-    text.setAttribute('y', ly);
-    text.setAttribute('fill', '#fff');
-    text.setAttribute('font-size', '12px');
-    text.setAttribute('font-family', 'sans-serif');
-    text.textContent = city.name;
-    g.appendChild(text);
-  });
-}
-
-
-
 function selectChoice(el){
-  // clear previous selection
   document.querySelectorAll('.choice').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
   btnNext.disabled=false;
-
   const chosen = el.textContent;
   const correct = answers[currentIndex].correct;
   answers[currentIndex].chosen = chosen;
 
-  // mark immediately
   document.querySelectorAll('.choice').forEach(c=>{
+    c.style.pointerEvents='none';
     if(c.textContent===correct) c.classList.add('correct');
     if(c.textContent===chosen && chosen!==correct) c.classList.add('wrong');
-    c.style.pointerEvents='none';
   });
-
-  if(chosen===correct) score++;
-  scoreDisplay.textContent=score;
   
-  if (chosen !== correct) {
-  // Show all distractors + correct city with labels
-  renderExtraDotsAndLabels(quizCities[currentIndex], answers[currentIndex].options, correct);
-}
-
-  // 👇 NEW: if this was the last question, finish immediately
-  if (currentIndex === quizCities.length - 1) {
-    finishQuiz();
+  const dotGroup = svgElement.querySelector('#dotGroup');
+  
+  if(chosen===correct) {
+    score++;
+    const dot = dotGroup?.querySelector('circle');
+    if(dot) {
+      dot.setAttribute('fill', '#22c55e');
+      dot.classList.remove('flash-dot');
+    }
+  } else {
+    // ***FIX***: Only show detailed annotations on wrong answers
+    if (dotGroup) dotGroup.style.display = 'none';
+    renderExtraDotsAndLabels(quizCities[currentIndex], answers[currentIndex].options, correct);
   }
+  
+  scoreDisplay.textContent=score;
+  if(currentIndex === quizCities.length - 1) finishQuiz();
 }
-
-
 
 btnNext.onclick=()=>{
   currentIndex++;
@@ -680,34 +731,55 @@ btnNext.onclick=()=>{
   updateProgress();
 };
 
+function resetUIAndStateForRestart(){
+  summaryPanel.style.display='none';
+  breakdown.innerHTML='';
+  finalScore.textContent='0 / 20';
+  finalPct.textContent='0%';
+  if(svgElement){
+    const dg = svgElement.querySelector('#dotGroup'); if(dg) dg.remove();
+    const eg = svgElement.querySelector('#extraGroup'); if(eg) eg.remove();
+  }
+  quizCities = []; answers = [];
+  currentIndex = 0; score = 0;
+  scoreDisplay.textContent='0';
+  choicesDiv.innerHTML='';
+  progressText.textContent='Question 0/20';
+  progressBar.style.width='0%';
+  btnNext.disabled = true;
+  document.querySelectorAll('.choice').forEach(c => c.style.pointerEvents = 'auto');
+}
 
 btnRestart.onclick = () => {
+  resetUIAndStateForRestart();
   document.getElementById('quizWrap').style.display = 'none';
   document.getElementById('difficultyScreen').style.display = 'block';
 };
+
 btnPlayAgain.onclick = btnRestart.onclick;
 
 function finishQuiz(){
+  btnNext.disabled = true;
   summaryPanel.style.display='block';
   finalScore.textContent=`${score}/${TOTAL_QUESTIONS}`;
   finalPct.textContent=Math.round(score/TOTAL_QUESTIONS*100)+'%';
   const rows=answers.map((a,i)=>`
     <tr class="${a.chosen===a.correct?'correct':'wrong'}">
       <td>${i+1}</td><td>${a.city.name}</td>
-      <td>${a.chosen||''}</td><td>${a.correct}</td>
+      <td>${a.chosen||'<i>No answer</i>'}</td><td>${a.correct}</td>
       <td>${a.chosen===a.correct?'✅':'❌'}</td></tr>`).join('');
-  breakdown.innerHTML=`<table><thead><tr><th>#</th><th>City</th><th>Your</th><th>Correct</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  breakdown.innerHTML=`<table><thead><tr><th>#</th><th>City</th><th>Your Answer</th><th>Correct</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-btnPlayAgain.onclick=()=>location.reload();
+
 btnExport.onclick=()=>{
-  const h=['Q','City','Your','Correct','Result'];
-  const r=answers.map((a,i)=>[i+1,a.city.name,a.chosen,a.correct,a.chosen===a.correct?'Correct':'Wrong']);
+  const h=['Question','City','Your Answer','Correct Answer','Result'];
+  const r=answers.map((a,i)=>[i+1,`"${a.city.name}"`,`"${a.chosen||''}"`,`"${a.correct}"`,a.chosen===a.correct?'Correct':'Wrong']);
   const csv=[h.join(','),...r.map(x=>x.join(','))].join('\n');
-  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='results.csv'; a.click(); URL.revokeObjectURL(url);
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='quiz_results.csv'; a.click(); URL.revokeObjectURL(url);
 };
-init();
 
 </script>
+
 </body>
 </html>
