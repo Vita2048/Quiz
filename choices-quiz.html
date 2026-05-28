@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hard Choices, Easy Life • Quiz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+    
+    body { font-family: 'Inter', system_ui, sans-serif; }
+    .font-display { font-family: 'Space Grotesk', 'Inter', system_ui, sans-serif; font-weight: 600; }
+
+    .option-card {
+      transition: all 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
+      border: 1.5px solid #e2e8f0;
+    }
+    .option-card:hover {
+      border-color: #cbd5e1;
+    }
+    .option-card.easy.selected {
+      border-color: #f59e0b;
+      background-color: #fefce8;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+    }
+    .option-card.hard.selected {
+      border-color: #10b981;
+      background-color: #ecfdf5;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+    }
+
+    .custom-radio {
+      width: 18px;
+      height: 18px;
+      accent-color: #0f766e;
+    }
+
+    .score-circle {
+      width: 140px; height: 140px;
+      border-radius: 9999px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .score-circle::before {
+      content: ''; position: absolute; width: 118px; height: 118px; background: white; border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-[820px] mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 bg-white px-4 py-1.5 rounded-2xl shadow-sm mb-4 border border-slate-200">
+        <i class="fa-solid fa-balance-scale text-teal-600"></i>
+        <span class="text-sm font-semibold text-teal-700 tracking-wider">HARD CHOICES, EASY LIFE</span>
+      </div>
+      
+      <h1 class="text-4xl font-display tracking-tighter font-bold text-slate-900">Are You Choosing<br>the Hard Path?</h1>
+      <p class="mt-3 text-lg text-slate-600 max-w-md mx-auto">Easy choices feel good now.<br>Hard choices create an easier life later.</p>
+    </div>
+
+    <!-- Intro -->
+    <div class="bg-white border border-slate-200 rounded-3xl p-6 mb-8 shadow-sm">
+      <div class="flex gap-4">
+        <div class="w-10 h-10 flex-shrink-0 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center">
+          <i class="fa-solid fa-lightbulb text-xl"></i>
+        </div>
+        <div class="text-sm leading-relaxed text-slate-600">
+          <p class="font-medium text-slate-700 mb-1">The core principle:</p>
+          <p><span class="font-semibold text-emerald-700">"Hard choices, easy life. Easy choices, hard life."</span></p>
+          <p class="mt-2">For each line, check the box next to the behavior that best describes what you actually do most of the time.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quiz -->
+    <div id="quiz-section">
+      <div class="flex items-center justify-between mb-3 px-1">
+        <div>
+          <span class="text-xs font-semibold tracking-[1.5px] text-slate-500">RATE YOUR TYPICAL CHOICES</span>
+          <h2 class="text-xl font-semibold tracking-tight -mt-0.5">5 Life Areas • 20 Specific Behaviors</h2>
+        </div>
+        <div class="text-xs font-medium px-3 py-1 bg-white border rounded-full text-slate-500 flex items-center gap-1.5">
+          <span id="progress-text">0/20 answered</span>
+        </div>
+      </div>
+
+      <!-- Category 1: Health & Fitness -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 mb-4 shadow-sm">
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="w-8 h-8 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-heart-pulse"></i>
+          </div>
+          <div>
+            <span class="text-xs font-semibold text-rose-600 tracking-wider">01</span>
+            <h3 class="font-semibold text-lg tracking-tight -mt-0.5">Health &amp; Fitness</h3>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <!-- Item 1 -->
+          <div class="grid grid-cols-2 gap-2" data-cat="1" data-item="1">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q1-1" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i>
+                  <span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Skipping the workout</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q1-1" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i>
+                  <span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Going to the gym even when I don’t feel like it</div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="grid grid-cols-2 gap-2" data-cat="1" data-item="2">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q1-2" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i>
+                  <span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Eating junk food</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q1-2" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i>
+                  <span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Eating vegetables and protein</div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="grid grid-cols-2 gap-2" data-cat="1" data-item="3">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q1-3" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i>
+                  <span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Scrolling instead of sleeping</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q1-3" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i>
+                  <span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Going to bed early</div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="grid grid-cols-2 gap-2" data-cat="1" data-item="4">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q1-4" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i>
+                  <span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Drinking every weekend</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q1-4" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i>
+                  <span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span>
+                </div>
+                <div class="text-sm leading-snug mt-0.5">Limiting alcohol</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 2: Money & Finances -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 mb-4 shadow-sm">
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="w-8 h-8 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-wallet"></i>
+          </div>
+          <div>
+            <span class="text-xs font-semibold text-orange-600 tracking-wider">02</span>
+            <h3 class="font-semibold text-lg tracking-tight -mt-0.5">Money &amp; Finances</h3>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2" data-cat="2" data-item="1">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q2-1" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Impulse shopping / buying things you don’t need</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q2-1" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Living below your means</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="2" data-item="2">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q2-2" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Buying new gadgets you don’t need</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q2-2" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Saying “no” to lifestyle inflation</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="2" data-item="3">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q2-3" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Eating out daily</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q2-3" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Saving and investing consistently</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="2" data-item="4">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q2-4" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Not tracking expenses</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q2-4" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Learning about money</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 3: Relationships -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 mb-4 shadow-sm">
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="w-8 h-8 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div>
+            <span class="text-xs font-semibold text-violet-600 tracking-wider">03</span>
+            <h3 class="font-semibold text-lg tracking-tight -mt-0.5">Relationships</h3>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2" data-cat="3" data-item="1">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q3-1" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Staying in toxic or mediocre relationships</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q3-1" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Setting boundaries</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="3" data-item="2">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q3-2" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Avoiding difficult conversations</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q3-2" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Having honest (sometimes uncomfortable) talks</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="3" data-item="3">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q3-3" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Scrolling social media instead of time with loved ones</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q3-3" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Investing real time and effort</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="3" data-item="4">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q3-4" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Keeping score in relationships</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q3-4" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Choosing people who align with your values</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 4: Career & Personal Growth -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 mb-4 shadow-sm">
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="w-8 h-8 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-briefcase"></i>
+          </div>
+          <div>
+            <span class="text-xs font-semibold text-sky-600 tracking-wider">04</span>
+            <h3 class="font-semibold text-lg tracking-tight -mt-0.5">Career &amp; Personal Growth</h3>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2" data-cat="4" data-item="1">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q4-1" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Staying in a comfortable but dead-end job</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q4-1" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Taking on challenging projects</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="4" data-item="2">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q4-2" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Consuming endless content</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q4-2" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Investing in education and new skills</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="4" data-item="3">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q4-3" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Avoiding feedback</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q4-3" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Asking for help and feedback</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="4" data-item="4">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q4-4" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Not learning new skills</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q4-4" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Putting in extra effort and embracing failure</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category 5: Daily Habits -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 mb-4 shadow-sm">
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="w-8 h-8 rounded-2xl bg-lime-100 text-lime-600 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <div>
+            <span class="text-xs font-semibold text-lime-600 tracking-wider">05</span>
+            <h3 class="font-semibold text-lg tracking-tight -mt-0.5">Daily Habits (The 1% Better Mindset)</h3>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2" data-cat="5" data-item="1">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q5-1" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Hitting snooze</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q5-1" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Waking up early</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="5" data-item="2">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q5-2" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Multitasking</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q5-2" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Focusing on one thing</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="5" data-item="3">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q5-3" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Saying yes to everything</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q5-3" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Saying no</div>
+              </div>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" data-cat="5" data-item="4">
+            <label class="option-card easy flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="easy">
+              <input type="radio" name="q5-4" value="easy" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-down text-amber-500 text-xs"></i><span class="text-[10px] font-bold text-amber-600">EASY CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Consuming more than creating</div>
+              </div>
+            </label>
+            <label class="option-card hard flex items-start gap-3 p-3 rounded-2xl cursor-pointer" data-type="hard">
+              <input type="radio" name="q5-4" value="hard" class="custom-radio mt-0.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-up text-emerald-600 text-xs"></i><span class="text-[10px] font-bold text-emerald-600">HARD CHOICE</span></div>
+                <div class="text-sm leading-snug mt-0.5">Creating instead of just consuming</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-center pt-2">
+        <button onclick="calculateScore()" 
+                class="px-8 py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.985] transition-all text-white font-semibold rounded-2xl text-sm flex items-center gap-2 shadow-lg shadow-slate-900/20">
+          <span>Calculate My Score &amp; Guidance</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-section" class="hidden mt-2">
+      <div class="bg-white border border-slate-200 rounded-3xl p-7 shadow-sm">
+        <div class="text-center mb-6">
+          <div class="text-xs font-semibold tracking-[1px] text-emerald-600 mb-1">YOUR RESULTS</div>
+          <h2 class="text-3xl font-display tracking-tighter">Hard Choice Score</h2>
+        </div>
+
+        <div class="flex justify-center mb-6">
+          <div id="score-display" class="score-circle bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl">
+            <div class="relative z-10 text-center">
+              <div id="score-number" class="text-5xl font-bold font-display tabular-nums leading-none">0</div>
+              <div class="text-emerald-400 text-xs font-bold tracking-[1px] -mt-1">/ 20</div>
+              <div id="score-percent" class="text-emerald-300 text-xs font-medium mt-1">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tier-badge" class="mx-auto w-fit px-4 py-1 rounded-2xl text-xs font-bold mb-5"></div>
+
+        <div id="overall-guidance" class="text-center text-sm leading-relaxed text-slate-600 max-w-md mx-auto"></div>
+
+        <div class="mt-8">
+          <div class="text-xs font-semibold text-slate-400 mb-3 px-1 tracking-wider">BREAKDOWN BY AREA</div>
+          <div id="breakdown-list" class="space-y-2 text-sm"></div>
+        </div>
+
+        <div class="mt-8 border-t pt-6 flex flex-col sm:flex-row gap-3 justify-center">
+          <button onclick="retakeQuiz()" 
+                  class="px-5 py-2.5 text-sm border border-slate-300 hover:bg-slate-50 active:bg-white transition font-medium rounded-2xl flex-1 sm:flex-none items-center justify-center gap-2 flex">
+            <i class="fa-solid fa-redo text-xs"></i>
+            <span>Retake Quiz</span>
+          </button>
+          <button onclick="shareResults()" 
+                  class="px-5 py-2.5 text-sm bg-white border border-slate-300 hover:bg-slate-50 active:bg-white transition font-medium rounded-2xl flex-1 sm:flex-none items-center justify-center gap-2 flex">
+            <i class="fa-solid fa-share-alt text-xs"></i>
+            <span>Share Result</span>
+          </button>
+        </div>
+      </div>
+      <div class="text-center mt-4">
+        <p class="text-[10px] text-slate-400">Hard choices compound into freedom. Easy choices compound into pain.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selections = {};
+
+    function updateProgress() {
+      const answered = Object.keys(selections).length;
+      const el = document.getElementById('progress-text');
+      if (el) el.textContent = `${answered}/20 answered`;
+    }
+
+    function initRadios() {
+      // Find all radio groups and attach listeners
+      document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+          if (this.checked) {
+            const container = this.closest('.grid');
+            const cat = container.dataset.cat;
+            const item = container.dataset.item;
+            const key = `${cat}-${item}`;
+
+            selections[key] = this.value;
+
+            // Update visual selection on both cards in this row
+            const easyCard = container.querySelector('.option-card.easy');
+            const hardCard = container.querySelector('.option-card.hard');
+
+            easyCard.classList.remove('selected');
+            hardCard.classList.remove('selected');
+
+            if (this.value === 'easy') {
+              easyCard.classList.add('selected');
+            } else {
+              hardCard.classList.add('selected');
+            }
+
+            updateProgress();
+          }
+        });
+      });
+    }
+
+    function calculateScore() {
+      const answered = Object.keys(selections).length;
+      if (answered < 20) {
+        alert(`Please answer all 20 choices. You have ${20 - answered} left.`);
+        return;
+      }
+
+      let hardCount = 0;
+      Object.values(selections).forEach(v => { if (v === 'hard') hardCount++; });
+
+      const percent = Math.round((hardCount / 20) * 100);
+
+      document.getElementById('quiz-section').classList.add('hidden');
+      const results = document.getElementById('results-section');
+      results.classList.remove('hidden');
+
+      document.getElementById('score-number').textContent = hardCount;
+      document.getElementById('score-percent').textContent = percent + '%';
+
+      const tierEl = document.getElementById('tier-badge');
+      const guidanceEl = document.getElementById('overall-guidance');
+
+      let tierText = '', tierClass = '', guidance = '';
+
+      if (hardCount >= 17) {
+        tierText = 'EXCEPTIONAL — MASTERING THE HARD PATH';
+        tierClass = 'bg-emerald-100 text-emerald-700';
+        guidance = 'You consistently choose the harder path across almost every area. This is how real freedom is built. Keep going — you’re already living the life most people only dream about.';
+      } else if (hardCount >= 13) {
+        tierText = 'VERY STRONG — ON THE RIGHT TRACK';
+        tierClass = 'bg-emerald-100 text-emerald-700';
+        guidance = 'Excellent work. You’re making hard choices in the majority of areas. The few easy defaults left are the only things standing between you and the next level.';
+      } else if (hardCount >= 9) {
+        tierText = 'DECENT — ROOM TO GROW';
+        tierClass = 'bg-amber-100 text-amber-700';
+        guidance = 'You’re aware of the right direction but still defaulting to comfort in several areas. Pick your 2 weakest categories and go all-in on the hard version for the next 30 days. Momentum will follow.';
+      } else if (hardCount >= 5) {
+        tierText = 'NEEDS ATTENTION';
+        tierClass = 'bg-orange-100 text-orange-700';
+        guidance = 'Easy choices are winning too often. The compound effect is already working against you. Start with ONE category this week and prove to yourself you can choose hard. Small wins rebuild everything.';
+      } else {
+        tierText = 'CRITICAL — EASY PATH DOMINANT';
+        tierClass = 'bg-red-100 text-red-700';
+        guidance = 'Most daily decisions are the easy version that feels good today but makes life significantly harder later. The good news: you now see the pattern clearly. Change starts with one hard choice today.';
+      }
+
+      tierEl.textContent = tierText;
+      tierEl.className = `mx-auto w-fit px-4 py-1 rounded-2xl text-xs font-bold mb-5 ${tierClass}`;
+      guidanceEl.innerHTML = guidance;
+
+      buildBreakdown();
+    }
+
+    function buildBreakdown() {
+      const container = document.getElementById('breakdown-list');
+      container.innerHTML = '';
+
+      const catNames = {
+        1: 'Health & Fitness',
+        2: 'Money & Finances',
+        3: 'Relationships',
+        4: 'Career & Personal Growth',
+        5: 'Daily Habits'
+      };
+
+      for (let cat = 1; cat <= 5; cat++) {
+        let hardInCat = 0;
+        for (let item = 1; item <= 4; item++) {
+          const key = `${cat}-${item}`;
+          if (selections[key] === 'hard') hardInCat++;
+        }
+
+        const pct = Math.round((hardInCat / 4) * 100);
+        const isStrong = hardInCat >= 3;
+        const isWeak = hardInCat <= 1;
+
+        const row = document.createElement('div');
+        row.className = `flex items-center gap-3 px-4 py-3 rounded-2xl border ${isStrong ? 'bg-emerald-50 border-emerald-100' : isWeak ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-200'}`;
+
+        row.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-sm">${catNames[cat]}</span>
+              <span class="text-xs font-mono tabular-nums ${isStrong ? 'text-emerald-700' : isWeak ? 'text-red-700' : 'text-slate-600'}">${hardInCat}/4</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
+              <div class="h-1.5 ${isStrong ? 'bg-emerald-500' : isWeak ? 'bg-red-500' : 'bg-amber-500'}" style="width: ${pct}%"></div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] font-semibold px-2 py-0.5 rounded ${isStrong ? 'bg-emerald-200 text-emerald-700' : isWeak ? 'bg-red-200 text-red-700' : 'bg-amber-200 text-amber-700'}">
+              ${pct}%
+            </span>
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function retakeQuiz() {
+      selections = {};
+
+      // Reset all radios
+      document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.checked = false;
+      });
+
+      // Remove selected classes from all cards
+      document.querySelectorAll('.option-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+
+      document.getElementById('progress-text').textContent = '0/20 answered';
+      document.getElementById('results-section').classList.add('hidden');
+      document.getElementById('quiz-section').classList.remove('hidden');
+      document.getElementById('quiz-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function shareResults() {
+      const hard = document.getElementById('score-number').textContent;
+      const percent = document.getElementById('score-percent').textContent;
+      const text = `I scored ${hard}/20 Hard Choices (${percent}) on the Hard Choices, Easy Life quiz.\n\nHard choices today = easy life tomorrow.`;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          const btns = document.querySelectorAll('#results-section button');
+          btns.forEach(b => {
+            if (b.textContent.includes('Share')) {
+              const orig = b.innerHTML;
+              b.innerHTML = `<i class="fa-solid fa-check mr-1"></i> Copied!`;
+              setTimeout(() => { b.innerHTML = orig; }, 1800);
+            }
+          });
+        });
+      } else {
+        prompt('Copy your result:', text);
+      }
+    }
+
+    function init() {
+      initRadios();
+      console.log('%c[Hard Choices Quiz] Checkbox version ready with 20 items.', 'color:#64748b;font-size:9px');
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
